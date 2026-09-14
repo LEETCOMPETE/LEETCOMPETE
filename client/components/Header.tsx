@@ -37,7 +37,7 @@ const Header = () => {
 	console.log(isOpen)
 
 	return (
-		<div className="bg-neutral overflow-x-hidden">
+		<div className="bg-neutral overflow-x-hidden border-b-1 border-solid border-b-gray-800">
 			<Container>
 				<div className="flex flex-row items-center h-14 text-white justify-between">
 					<h1 className="text-primary">LEETCOMPETE</h1>
