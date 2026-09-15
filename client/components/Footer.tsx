@@ -9,7 +9,7 @@ const links = [
 
 export default function Footer() {
 	return (
-		<footer className="bg-neutral text-white">
+		<footer className="bg-neutral text-white border-solid border-t-1 border-gray-800">
 			<Container className="flex flex-wrap py-5 max-lg:text-center justify-between items-center">
 				<p>© 2025 LEETCOMPETE. All rights reserved.</p>
 				<div className="flex  gap-3 text-xs">
