@@ -14,7 +14,7 @@ const event = {
 	typeOfPrize: "wallet points"
 }
 
-function remaining(targetDate) {
+function remaining(targetDate: Date) {
 	const diff = targetDate.getTime() - Date.now();
 	const days = Math.floor(diff / 86400000);
 	const hours = Math.floor((diff % 86400000) / 3600000);
