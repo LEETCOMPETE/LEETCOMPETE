@@ -84,51 +84,51 @@ export default function ContestLeaderboardPage() {
       </div>
 
       {/* Header Banner */}
-      <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 space-y-4 shadow-2xl relative overflow-hidden">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="bg-[#121620] border border-slate-800 rounded-lg p-5 space-y-2">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="space-y-1">
-            <div className="flex items-center space-x-2">
+            <div className="flex items-center space-x-2.5">
               <Trophy className="w-6 h-6 text-amber-400" />
-              <h1 className="text-2xl sm:text-3xl font-bold font-mono text-white">
-                Live Contest Leaderboard
+              <h1 className="text-xl font-bold font-sans text-white tracking-tight">
+                {contest?.title || 'Contest Ranklist'}
               </h1>
             </div>
             <p className="text-xs text-slate-400 font-sans">
-              Contest: <span className="font-semibold text-slate-200">{contest?.title}</span>
+              Official Live Contest Ranklist & Scoreboard
             </p>
           </div>
 
           <div className="text-right text-xs font-mono text-slate-400">
-            <div>Last Updated: {lastUpdated.toLocaleTimeString()}</div>
-            <div className="text-[10px] text-slate-500">Auto-refreshes live every 6 seconds</div>
+            <div>Updated: {lastUpdated.toLocaleTimeString()}</div>
+            <div className="text-[10px] text-amber-400">Auto-refreshes every 6s</div>
           </div>
         </div>
       </div>
 
       {/* Leaderboard Table */}
       {leaderboard.length === 0 ? (
-        <div className="p-12 text-center text-slate-400 font-mono text-sm bg-slate-900/50 rounded-2xl border border-slate-800">
+        <div className="p-8 text-center text-slate-400 font-mono text-xs bg-[#121620] rounded-lg border border-slate-800">
           No team submissions recorded yet.
         </div>
       ) : (
-        <div className="bg-slate-900 border border-slate-800 rounded-3xl overflow-hidden shadow-2xl">
+        <div className="bg-[#121620] border border-slate-800 rounded-lg overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-left font-mono text-xs">
-              <thead className="bg-slate-950/90 border-b border-slate-800 text-slate-400 uppercase tracking-wider">
+              <thead className="bg-[#0B1120] border-b border-slate-800 text-slate-400 uppercase tracking-wider font-sans font-bold">
                 <tr>
-                  <th className="px-5 py-4 w-16 text-center">Rank</th>
-                  <th className="px-6 py-4">Team & School / Institution</th>
-                  <th className="px-6 py-4 text-center">Solved</th>
-                  <th className="px-6 py-4 text-center">Score</th>
-                  <th className="px-6 py-4 text-center">Time Penalty</th>
+                  <th className="px-4 py-3.5 w-14 text-center">RANK</th>
+                  <th className="px-5 py-3.5">USER / TEAM</th>
+                  <th className="px-4 py-3.5 text-center">SOLVED</th>
+                  <th className="px-4 py-3.5 text-center">SCORE</th>
+                  <th className="px-4 py-3.5 text-center">PENALTY</th>
                   {problems.map((p: any, idx: number) => (
-                    <th key={p.id} className="px-4 py-4 text-center min-w-[90px]">
+                    <th key={p.id} className="px-3 py-3.5 text-center min-w-[80px]">
                       {String.fromCharCode(65 + idx)}
                     </th>
                   ))}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-800/60">
+              <tbody className="divide-y divide-slate-800/80">
                 {leaderboard.map((entry) => (
                   <tr
                     key={entry.user_id}

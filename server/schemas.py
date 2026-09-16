@@ -22,6 +22,18 @@ class UserResponse(BaseModel):
     class Config:
         from_attributes = True
 
+class UserDetailResponse(UserResponse):
+    created_at: datetime
+
+class UserAdminCreate(BaseModel):
+    name: str
+    email: EmailStr
+    password: str
+    role: str = "participant"
+
+class UserRoleUpdate(BaseModel):
+    role: str
+
 class Token(BaseModel):
     access_token: str
     token_type: str = "bearer"
@@ -37,6 +49,20 @@ class RegistrationInfo(BaseModel):
     id: int
     user_id: int
     contest_id: int
+    team_name: Optional[str] = None
+    members: Optional[str] = None
+    school: Optional[str] = None
+    registered_at: datetime
+
+    class Config:
+        from_attributes = True
+
+class ContestRegistrationDetail(BaseModel):
+    id: int
+    contest_id: int
+    user_id: int
+    user_name: str
+    user_email: str
     team_name: Optional[str] = None
     members: Optional[str] = None
     school: Optional[str] = None
@@ -82,6 +108,12 @@ class ProblemResponse(BaseModel):
 class ProblemDetailResponse(ProblemResponse):
     sample_test_cases: List[TestCaseResponse] = []
 
+class CodeforcesImportRequest(BaseModel):
+    url: str
+
+class JSONTestCaseParseRequest(BaseModel):
+    json_content: str
+
 # Contest Schemas
 class ContestCreate(BaseModel):
     title: str
@@ -90,6 +122,10 @@ class ContestCreate(BaseModel):
     end_time: datetime
     registration_start_time: Optional[datetime] = None
     registration_end_time: Optional[datetime] = None
+    max_participants: Optional[int] = None
+    max_team_members: Optional[int] = 3
+    allow_all_members_submit: Optional[bool] = True
+    show_checker_logs: Optional[bool] = False
 
 class ContestUpdate(BaseModel):
     title: Optional[str] = None
@@ -98,6 +134,10 @@ class ContestUpdate(BaseModel):
     end_time: Optional[datetime] = None
     registration_start_time: Optional[datetime] = None
     registration_end_time: Optional[datetime] = None
+    max_participants: Optional[int] = None
+    max_team_members: Optional[int] = None
+    allow_all_members_submit: Optional[bool] = None
+    show_checker_logs: Optional[bool] = None
 
 
 class ContestResponse(BaseModel):
@@ -108,10 +148,15 @@ class ContestResponse(BaseModel):
     end_time: datetime
     registration_start_time: Optional[datetime] = None
     registration_end_time: Optional[datetime] = None
+    max_participants: Optional[int] = None
+    max_team_members: Optional[int] = 3
+    allow_all_members_submit: bool = True
+    show_checker_logs: bool = False
+    registered_count: int = 0
     created_by: int
     status: str  # "UPCOMING", "LIVE", "PAST"
     is_launched: bool = False
-    registration_status: str = "REGISTRATION_OPEN"  # "REGISTRATION_OPEN", "REGISTRATION_NOT_STARTED", "REGISTRATION_CLOSED"
+    registration_status: str = "REGISTRATION_OPEN"  # "REGISTRATION_OPEN", "REGISTRATION_NOT_STARTED", "REGISTRATION_CLOSED", "REGISTRATION_FULL"
     is_registered: Optional[bool] = False
     registration_info: Optional[RegistrationInfo] = None
 
@@ -132,6 +177,7 @@ class TestCaseResult(BaseModel):
     test_case_id: int
     is_sample: bool
     status: str  # AC, WA, TLE, RE
+    input_str: Optional[str] = None
     user_output: Optional[str] = None
     expected_output: Optional[str] = None
     execution_time_ms: Optional[float] = None
@@ -141,6 +187,7 @@ class SubmissionResponse(BaseModel):
     id: int
     user_id: int
     user_name: Optional[str] = None
+    team_name: Optional[str] = None
     problem_id: int
     problem_title: Optional[str] = None
     contest_id: int
@@ -150,6 +197,7 @@ class SubmissionResponse(BaseModel):
     score: float
     submitted_at: datetime
     test_case_results: Optional[List[TestCaseResult]] = None
+    judgement_protocol: Optional[str] = None
 
     class Config:
         from_attributes = True

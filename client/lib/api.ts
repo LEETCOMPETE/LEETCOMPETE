@@ -1,4 +1,4 @@
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+const API_URL = process.env.NEXT_PUBLIC_API_URL || '/api';
 
 export async function fetchApi(endpoint: string, options: RequestInit = {}) {
   const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
@@ -31,6 +31,12 @@ export const api = {
   login: (data: any) => fetchApi('/auth/login', { method: 'POST', body: JSON.stringify(data) }),
   getMe: () => fetchApi('/auth/me'),
 
+  // Admin User Management
+  getUsers: () => fetchApi('/admin/users'),
+  createUser: (data: any) => fetchApi('/admin/users', { method: 'POST', body: JSON.stringify(data) }),
+  updateUserRole: (id: number | string, role: string) => fetchApi(`/admin/users/${id}/role`, { method: 'PUT', body: JSON.stringify({ role }) }),
+  deleteUser: (id: number | string) => fetchApi(`/admin/users/${id}`, { method: 'DELETE' }),
+
   // Contests
   getContests: () => fetchApi('/contests'),
   getContest: (id: number | string) => fetchApi(`/contests/${id}`),
@@ -39,12 +45,19 @@ export const api = {
   launchContest: (id: number | string) => fetchApi(`/contests/${id}/launch`, { method: 'POST' }),
   deleteContest: (id: number | string) => fetchApi(`/contests/${id}`, { method: 'DELETE' }),
   registerContest: (id: number | string, data: any) => fetchApi(`/contests/${id}/register`, { method: 'POST', body: JSON.stringify(data) }),
+  getContestRegistrations: (id: number | string) => fetchApi(`/contests/${id}/registrations`),
 
   // Problems
   getProblems: (contestId: number | string) => fetchApi(`/contests/${contestId}/problems`),
   getProblem: (id: number | string) => fetchApi(`/problems/${id}`),
   createProblem: (contestId: number | string, data: any) =>
     fetchApi(`/contests/${contestId}/problems`, { method: 'POST', body: JSON.stringify(data) }),
+  importCodeforcesProblem: (contestId: number | string, url: string) =>
+    fetchApi(`/contests/${contestId}/import-codeforces`, { method: 'POST', body: JSON.stringify({ url }) }),
+  parseCodeforcesProblem: (url: string) =>
+    fetchApi('/parse-codeforces', { method: 'POST', body: JSON.stringify({ url }) }),
+  parseTestCasesJson: (jsonContent: string) =>
+    fetchApi('/parse-test-cases-json', { method: 'POST', body: JSON.stringify({ json_content: jsonContent }) }),
 
   // Submissions
   submitCode: (data: any) => fetchApi('/submissions', { method: 'POST', body: JSON.stringify(data) }),

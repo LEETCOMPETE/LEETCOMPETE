@@ -4,7 +4,7 @@ import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
-import { Trophy, Clock, Search, Shield, PlusCircle, CheckCircle2, ArrowRight } from 'lucide-react';
+import { Trophy, Clock, Search, PlusCircle, CheckCircle2, ArrowRight, Calendar, Award } from 'lucide-react';
 
 export default function ContestsListPage() {
   const { user } = useAuth();
@@ -28,138 +28,180 @@ export default function ContestsListPage() {
   });
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-200 dark:border-slate-800 pb-4">
         <div>
-          <h1 className="text-3xl font-bold font-mono text-white flex items-center space-x-3">
-            <Trophy className="w-8 h-8 text-emerald-400" />
-            <span>Contest Arena</span>
+          <h1 className="text-xl font-bold font-sans text-slate-900 dark:text-white tracking-tight">
+            Contest Arena
           </h1>
-          <p className="text-xs text-slate-400 font-sans mt-1">
-            Browse live, upcoming, and archived competitive programming rounds
+          <p className="text-xs text-slate-500 dark:text-slate-400 font-sans">
+            Browse and compete in active, upcoming, or past algorithmic challenges.
           </p>
         </div>
 
         {user?.role === 'organizer' && (
           <Link
             href="/admin/contests/new"
-            className="px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-mono text-sm font-bold transition-all flex items-center space-x-2 shadow-lg shadow-amber-500/20 self-start"
+            className="px-4 py-2 rounded bg-amber-500 hover:bg-amber-400 text-slate-950 font-sans text-xs font-bold transition-colors flex items-center space-x-1.5 self-start shadow-sm"
           >
             <PlusCircle className="w-4 h-4" />
-            <span>New Contest</span>
+            <span>+ CREATE CONTEST</span>
           </Link>
         )}
       </div>
 
-      {/* Search & Filters */}
-      <div className="flex flex-col sm:flex-row gap-4 justify-between bg-slate-900 border border-slate-800 p-4 rounded-2xl">
+      {/* CodeChef Search & Filter Bar */}
+      <div className="flex flex-col sm:flex-row gap-3 justify-between bg-white dark:bg-[#121620] border border-slate-200 dark:border-slate-800 p-3 rounded-lg shadow-sm">
         <div className="relative flex-1">
-          <Search className="w-4 h-4 text-slate-500 absolute left-3.5 top-3.5" />
+          <Search className="w-4 h-4 text-slate-400 dark:text-slate-500 absolute left-3 top-2.5" />
           <input
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search contest title or keywords..."
-            className="w-full bg-slate-950 border border-slate-800 focus:border-emerald-500 rounded-xl pl-10 pr-4 py-2 text-sm font-mono text-white placeholder-slate-600 outline-none transition-all"
+            placeholder="Search contest by title..."
+            className="w-full bg-slate-50 dark:bg-[#0B1120] border border-slate-300 dark:border-slate-700/80 focus:border-amber-500 rounded pl-9 pr-3 py-1.5 text-xs font-mono text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 outline-none transition-colors"
           />
         </div>
 
-        <div className="flex items-center space-x-2 font-mono text-xs">
-          {['ALL', 'LIVE', 'UPCOMING', 'PAST'].map((st) => (
+        <div className="flex items-center space-x-1 text-xs font-semibold">
+          {[
+            { id: 'ALL', label: 'All Contests' },
+            { id: 'LIVE', label: '● Present (Live)' },
+            { id: 'UPCOMING', label: 'Upcoming' },
+            { id: 'PAST', label: 'Past' },
+          ].map((st) => (
             <button
-              key={st}
-              onClick={() => setFilterStatus(st)}
-              className={`px-3 py-2 rounded-xl transition-all font-semibold ${
-                filterStatus === st
-                  ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30'
-                  : 'bg-slate-950 text-slate-400 border border-slate-800 hover:text-slate-200'
+              key={st.id}
+              onClick={() => setFilterStatus(st.id)}
+              className={`px-3 py-1.5 rounded transition-colors ${
+                filterStatus === st.id
+                  ? 'bg-amber-500 text-slate-950 font-bold'
+                  : 'bg-slate-100 dark:bg-[#0B1120] text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-slate-700/80 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200 dark:hover:bg-slate-800'
               }`}
             >
-              {st}
+              {st.label}
             </button>
           ))}
         </div>
       </div>
 
-      {/* Contest Grid */}
+      {/* CodeChef Contest Table */}
       {loading ? (
-        <div className="p-12 text-center text-slate-400 font-mono text-sm animate-pulse bg-slate-900/50 rounded-2xl border border-slate-800">
-          Loading contests...
+        <div className="p-8 text-center text-slate-500 dark:text-slate-400 font-mono text-xs bg-white dark:bg-[#121620] rounded-lg border border-slate-200 dark:border-slate-800">
+          Loading CodeChef contest schedule...
         </div>
       ) : filteredContests.length === 0 ? (
-        <div className="p-12 text-center text-slate-400 font-mono text-sm bg-slate-900/50 rounded-2xl border border-slate-800">
-          No contests found matching your search.
+        <div className="p-8 text-center text-slate-500 dark:text-slate-400 font-mono text-xs bg-white dark:bg-[#121620] rounded-lg border border-slate-200 dark:border-slate-800">
+          No contests found for the selected filter.
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {filteredContests.map((c) => (
-            <div
-              key={c.id}
-              className="bg-slate-900 border border-slate-800 hover:border-slate-700 rounded-2xl p-6 transition-all shadow-xl flex flex-col justify-between space-y-4"
-            >
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <span
-                    className={`px-2.5 py-1 rounded-full text-[10px] font-mono font-bold tracking-wider uppercase border ${
-                      c.status === 'LIVE'
-                        ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30 animate-pulse'
-                        : c.status === 'UPCOMING'
-                        ? 'bg-cyan-500/10 text-cyan-400 border-cyan-500/30'
-                        : 'bg-slate-800 text-slate-400 border-slate-700'
-                    }`}
-                  >
-                    ● {c.status}
-                  </span>
+        <div className="bg-white dark:bg-[#121620] border border-slate-200 dark:border-slate-800 rounded-lg overflow-hidden shadow-sm">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left font-sans text-xs">
+              <thead className="bg-slate-100 dark:bg-[#0B1120] border-b border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 font-bold uppercase tracking-wider">
+                <tr>
+                  <th className="px-4 py-3.5 w-32">CODE</th>
+                  <th className="px-5 py-3.5">CONTEST NAME</th>
+                  <th className="px-4 py-3.5">START TIME</th>
+                  <th className="px-4 py-3.5 text-center">DURATION</th>
+                  <th className="px-4 py-3.5 text-center">STATUS</th>
+                  <th className="px-5 py-3.5 text-right">ACTIONS</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-200 dark:divide-slate-800/80">
+                {filteredContests.map((c, idx) => {
+                  const codeStr = `START${100 + c.id}`;
+                  return (
+                    <tr key={c.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
+                      {/* CodeChef Contest Code Badge */}
+                      <td className="px-4 py-4 font-mono font-bold">
+                        <span className="px-2 py-1 rounded bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/30 text-[11px]">
+                          {codeStr}
+                        </span>
+                      </td>
 
-                  {c.is_registered && (
-                    <span className="px-2.5 py-1 rounded-full text-[10px] font-mono font-semibold bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 flex items-center space-x-1">
-                      <CheckCircle2 className="w-3 h-3 text-emerald-400" />
-                      <span>Registered</span>
-                    </span>
-                  )}
-                </div>
+                      {/* Title & Description */}
+                      <td className="px-5 py-4 space-y-1">
+                        <div className="flex items-center space-x-2">
+                          <Link
+                            href={`/contests/${c.id}`}
+                            className="font-bold text-sm text-slate-900 dark:text-white hover:text-amber-600 dark:hover:text-amber-400 transition-colors"
+                          >
+                            {c.title}
+                          </Link>
+                          {c.is_registered && (
+                            <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30">
+                              ✓ Registered
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs text-slate-500 dark:text-slate-400 line-clamp-1">
+                          {c.description}
+                        </p>
+                      </td>
 
-                <h2 className="text-xl font-bold font-mono text-white hover:text-emerald-400 transition-colors">
-                  <Link href={`/contests/${c.id}`}>{c.title}</Link>
-                </h2>
+                      {/* Start Time */}
+                      <td className="px-4 py-4 text-slate-700 dark:text-slate-300 font-mono text-[11px]">
+                        {new Date(c.start_time).toLocaleString(undefined, {
+                          month: 'short',
+                          day: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit'
+                        })}
+                      </td>
 
-                <p className="text-xs text-slate-400 font-sans line-clamp-3">
-                  {c.description}
-                </p>
+                      {/* Duration */}
+                      <td className="px-4 py-4 text-center text-slate-700 dark:text-slate-300 font-mono text-[11px]">
+                        24 Hrs
+                      </td>
 
-                <div className="pt-2 flex flex-wrap gap-4 text-xs font-mono text-slate-400">
-                  <div className="flex items-center space-x-1">
-                    <Clock className="w-3.5 h-3.5 text-slate-500" />
-                    <span>Start: {new Date(c.start_time).toLocaleString()}</span>
-                  </div>
-                </div>
-              </div>
+                      {/* Status */}
+                      <td className="px-4 py-4 text-center">
+                        <span
+                          className={`px-2.5 py-1 rounded text-[10px] font-mono font-bold uppercase border ${
+                            c.status === 'LIVE'
+                              ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30'
+                              : c.status === 'UPCOMING'
+                              ? 'bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border-cyan-500/30'
+                              : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border-slate-300 dark:border-slate-700'
+                          }`}
+                        >
+                          {c.status}
+                        </span>
+                      </td>
 
-              <div className="pt-4 border-t border-slate-800/80 flex items-center justify-between gap-2">
-                <Link
-                  href={`/contests/${c.id}/leaderboard`}
-                  className="px-3 py-2 rounded-xl bg-slate-950 hover:bg-slate-800 border border-slate-800 text-slate-300 font-mono text-xs transition-all flex items-center space-x-1.5"
-                >
-                  <Trophy className="w-3.5 h-3.5 text-amber-400" />
-                  <span>Leaderboard</span>
-                </Link>
-
-                <Link
-                  href={`/contests/${c.id}`}
-                  className="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-mono text-xs font-bold transition-all flex items-center space-x-1.5 shadow-md shadow-emerald-500/20"
-                >
-                  <span>Enter Contest</span>
-                  <ArrowRight className="w-3.5 h-3.5" />
-                </Link>
-              </div>
-
-            </div>
-          ))}
+                      {/* Actions */}
+                      <td className="px-5 py-3 text-right whitespace-nowrap">
+                        <div className="flex flex-col items-end gap-1.5">
+                          <Link
+                            href={`/contests/${c.id}`}
+                            className="w-28 py-1.5 rounded bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs transition-colors inline-flex items-center justify-center space-x-1.5 shadow-sm"
+                          >
+                            <span>Compete</span>
+                            <ArrowRight className="w-3.5 h-3.5" />
+                          </Link>
+                          <Link
+                            href={`/contests/${c.id}/leaderboard`}
+                            className="w-28 py-1.5 rounded bg-slate-100 dark:bg-[#0B1120] hover:bg-slate-200 dark:hover:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 text-xs font-semibold transition-colors inline-flex items-center justify-center space-x-1.5"
+                          >
+                            <Award className="w-3.5 h-3.5 text-amber-500 dark:text-amber-400" />
+                            <span>Ranklist</span>
+                          </Link>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 
     </div>
   );
 }
+
+

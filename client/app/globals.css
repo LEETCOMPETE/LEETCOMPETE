@@ -3,141 +3,244 @@
 @import "shadcn/tailwind.css";
 
 @custom-variant dark (&:is(.dark *));
+@custom-variant light (&:is(.light *));
 
 @theme inline {
-	--color-primary: #00F59B;
-	--color-secondary: #F59E0B;
-	--color-tertiary: #EF4444;
-	--color-neutral: #0B0F19;
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
+  --color-primary: #00F59B;
+  --color-secondary: #F59E0B;
+  --color-tertiary: #EF4444;
+  --color-neutral: #0B0F19;
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-mono);
   --font-heading: var(--font-mono);
-  --color-sidebar-ring: var(--sidebar-ring);
-  --color-sidebar-border: var(--sidebar-border);
-  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
-  --color-sidebar-accent: var(--sidebar-accent);
-  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
-  --color-sidebar-primary: var(--sidebar-primary);
-  --color-sidebar-foreground: var(--sidebar-foreground);
-  --color-sidebar: var(--sidebar);
-  --color-chart-5: var(--chart-5);
-  --color-chart-4: var(--chart-4);
-  --color-chart-3: var(--chart-3);
-  --color-chart-2: var(--chart-2);
-  --color-chart-1: var(--chart-1);
-  --color-ring: var(--ring);
-  --color-input: var(--input);
-  --color-border: var(--border);
-  --color-destructive: var(--destructive);
-  --color-accent-foreground: var(--accent-foreground);
-  --color-accent: var(--accent);
-  --color-muted-foreground: var(--muted-foreground);
-  --color-muted: var(--muted);
-  --color-secondary-foreground: var(--secondary-foreground);
-  --color-secondary: var(--secondary);
-  --color-primary-foreground: var(--primary-foreground);
-  --color-popover-foreground: var(--popover-foreground);
-  --color-popover: var(--popover);
-  --color-card-foreground: var(--card-foreground);
-  --color-card: var(--card);
-  --radius-sm: calc(var(--radius) * 0.6);
-  --radius-md: calc(var(--radius) * 0.8);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) * 1.4);
-  --radius-2xl: calc(var(--radius) * 1.8);
-  --radius-3xl: calc(var(--radius) * 2.2);
-  --radius-4xl: calc(var(--radius) * 2.6);
 }
 
 :root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --radius: 0.625rem;
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+  --background: #f8fafc;
+  --foreground: #0f172a;
 }
 
-.dark {
-  --background: var(--color-neutral);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
+html.dark, [data-theme='dark'] {
+  --background: #0B1120;
+  --foreground: #f8fafc;
+  color-scheme: dark;
 }
 
-[data-theme='light'] {
-  --background: #ffffff;
-  --foreground: #000000;
-}
- 
-[data-theme='dark'] {
-  --background: var(--color-neutral);
-  --foreground: #ededed;
+html.light, [data-theme='light'] {
+  --background: #f8fafc;
+  --foreground: #0f172a;
+  color-scheme: light;
 }
 
-@layer base {
-  * {
-    @apply border-border outline-ring/50;
-  }
-  body {
-    @apply bg-background text-foreground;
-  }
-  html {
-    @apply font-mono;
-  }
+/* Light Theme Component Overrides */
+html.light body,
+[data-theme='light'] body {
+  background-color: #f8fafc !important;
+  color: #0f172a !important;
 }
+
+html.light header,
+[data-theme='light'] header {
+  background-color: #ffffff !important;
+  border-color: #e2e8f0 !important;
+  color: #0f172a !important;
+}
+
+html.light footer,
+[data-theme='light'] footer {
+  background-color: #f1f5f9 !important;
+  border-color: #e2e8f0 !important;
+  color: #475569 !important;
+}
+
+html.light .bg-slate-900,
+html.light .bg-slate-950,
+html.light .bg-\[\#121620\],
+html.light .bg-\[\#121620\]\/80,
+html.light .bg-\[\#121620\]\/90,
+[data-theme='light'] .bg-slate-900,
+[data-theme='light'] .bg-slate-950,
+[data-theme='light'] .bg-\[\#121620\],
+[data-theme='light'] .bg-\[\#121620\]\/80,
+[data-theme='light'] .bg-\[\#121620\]\/90 {
+  background-color: #ffffff !important;
+  border-color: #e2e8f0 !important;
+  color: #0f172a !important;
+}
+
+html.light .bg-slate-900\/50,
+html.light .bg-slate-950\/80,
+html.light .bg-\[\#0B1120\],
+html.light .bg-\[\#0b1120\],
+[data-theme='light'] .bg-slate-900\/50,
+[data-theme='light'] .bg-slate-950\/80,
+[data-theme='light'] .bg-\[\#0B1120\],
+[data-theme='light'] .bg-\[\#0b1120\] {
+  background-color: #f1f5f9 !important;
+  border-color: #cbd5e1 !important;
+  color: #0f172a !important;
+}
+
+html.light .border-slate-800,
+html.light .border-slate-800\/60,
+html.light .border-slate-800\/80,
+html.light .border-slate-700,
+html.light .border-slate-700\/80,
+[data-theme='light'] .border-slate-800,
+[data-theme='light'] .border-slate-800\/60,
+[data-theme='light'] .border-slate-800\/80,
+[data-theme='light'] .border-slate-700,
+[data-theme='light'] .border-slate-700\/80 {
+  border-color: #e2e8f0 !important;
+}
+
+html.light .text-white,
+html.light .text-slate-100,
+html.light .text-slate-200,
+html.light .text-slate-300,
+[data-theme='light'] .text-white,
+[data-theme='light'] .text-slate-100,
+[data-theme='light'] .text-slate-200,
+[data-theme='light'] .text-slate-300 {
+  color: #0f172a !important;
+}
+
+html.light .text-slate-400,
+html.light .text-slate-500,
+[data-theme='light'] .text-slate-400,
+[data-theme='light'] .text-slate-500 {
+  color: #475569 !important;
+}
+
+html.light input:not([type='checkbox']):not([type='radio']),
+html.light textarea,
+html.light select,
+[data-theme='light'] input:not([type='checkbox']):not([type='radio']),
+[data-theme='light'] textarea,
+[data-theme='light'] select {
+  background-color: #ffffff !important;
+  border-color: #cbd5e1 !important;
+  color: #0f172a !important;
+}
+
+html.light input::placeholder,
+html.light textarea::placeholder,
+[data-theme='light'] input::placeholder,
+[data-theme='light'] textarea::placeholder {
+  color: #94a3b8 !important;
+}
+
+html.light table thead,
+[data-theme='light'] table thead {
+  background-color: #f1f5f9 !important;
+  color: #475569 !important;
+}
+
+html.light tr:hover,
+[data-theme='light'] tr:hover {
+  background-color: #f1f5f9 !important;
+}
+
+/* Codeforces HTML Problem Statement Styles */
+.problem-statement .section-title {
+  color: #d97706;
+  font-family: var(--font-mono), monospace;
+  font-weight: 700;
+  font-size: 0.875rem;
+  padding-top: 1rem;
+  padding-bottom: 0.25rem;
+  border-bottom: 1px solid rgba(226, 232, 240, 0.8);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-top: 1.25rem;
+  margin-bottom: 0.75rem;
+}
+
+html.dark .problem-statement .section-title,
+[data-theme='dark'] .problem-statement .section-title {
+  color: #f59e0b;
+  border-bottom-color: rgba(51, 65, 85, 0.8);
+}
+
+.problem-statement p {
+  margin-bottom: 0.875rem;
+  line-height: 1.65;
+  color: #334155;
+}
+
+html.dark .problem-statement p,
+[data-theme='dark'] .problem-statement p {
+  color: #e2e8f0;
+}
+
+.problem-statement ul, .problem-statement ol {
+  margin-left: 1.5rem;
+  margin-bottom: 0.875rem;
+  list-style-type: disc;
+}
+
+.problem-statement code, .problem-statement .tt {
+  background-color: #f1f5f9;
+  border: 1px solid #cbd5e1;
+  padding: 0.125rem 0.375rem;
+  border-radius: 0.25rem;
+  font-family: var(--font-mono), monospace;
+  color: #d97706;
+  font-size: 0.85em;
+}
+
+html.dark .problem-statement code,
+html.dark .problem-statement .tt,
+[data-theme='dark'] .problem-statement code,
+[data-theme='dark'] .problem-statement .tt {
+  background-color: #0b1120;
+  border-color: #1e293b;
+  color: #fbbf24;
+}
+
+.problem-statement .tex-span {
+  font-family: Georgia, serif;
+  color: #b45309;
+  padding: 0 0.2rem;
+}
+
+html.dark .problem-statement .tex-span,
+[data-theme='dark'] .problem-statement .tex-span {
+  color: #fef08a;
+}
+
+.problem-statement .tex-font-style-it {
+  font-style: italic;
+}
+
+.problem-statement .tex-font-style-bf {
+  font-weight: 700;
+}
+
+.problem-statement img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 0.5rem;
+  margin: 1.25rem auto;
+  display: block;
+  border: 1px solid #cbd5e1;
+}
+
+html.dark .problem-statement img,
+[data-theme='dark'] .problem-statement img {
+  border-color: #1e293b;
+}
+
+/* KaTeX Math Formatting Overrides */
+.katex {
+  font-size: 1.05em;
+}
+html.light .katex,
+[data-theme='light'] .katex {
+  color: #0f172a !important;
+}
+html.dark .katex,
+[data-theme='dark'] .katex {
+  color: #f8fafc;
+}
+

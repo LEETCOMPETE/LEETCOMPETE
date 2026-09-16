@@ -13,9 +13,9 @@ class User(Base):
     role = Column(String(20), default="participant")  # "organizer" or "participant"
     created_at = Column(DateTime, default=datetime.utcnow)
 
-    contests_created = relationship("Contest", back_populates="creator")
-    submissions = relationship("Submission", back_populates="user")
-    registrations = relationship("Registration", back_populates="user")
+    contests_created = relationship("Contest", back_populates="creator", cascade="all, delete-orphan")
+    submissions = relationship("Submission", back_populates="user", cascade="all, delete-orphan")
+    registrations = relationship("Registration", back_populates="user", cascade="all, delete-orphan")
 
 class Contest(Base):
     __tablename__ = "contests"
@@ -27,6 +27,10 @@ class Contest(Base):
     end_time = Column(DateTime, nullable=False)
     registration_start_time = Column(DateTime, nullable=True)
     registration_end_time = Column(DateTime, nullable=True)
+    max_participants = Column(Integer, nullable=True)  # Nullable: None means unlimited
+    max_team_members = Column(Integer, default=3, nullable=True)  # Max team members allowed per team
+    allow_all_members_submit = Column(Boolean, default=True)  # True = all members submit, False = leader only
+    show_checker_logs = Column(Boolean, default=False)  # True = show detailed checker protocol for failed submissions
     is_launched = Column(Boolean, default=False)
     created_by = Column(Integer, ForeignKey("users.id"))
     created_at = Column(DateTime, default=datetime.utcnow)

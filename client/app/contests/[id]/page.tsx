@@ -5,7 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
-import { Trophy, Clock, CheckCircle2, AlertCircle, ArrowRight, Code2, Users, Building, Shield, X, Calendar, Trash2, Rocket, Lock, Edit3 } from 'lucide-react';
+import { Trophy, Clock, CheckCircle2, AlertCircle, ArrowRight, Code2, Users, Building, Shield, X, Calendar, Trash2, Rocket, Lock, Edit3, Plus } from 'lucide-react';
 
 function toLocalISOString(dateStr?: string): string {
   if (!dateStr) return '';
@@ -27,12 +27,15 @@ export default function ContestDetailPage() {
   const [showEditRegModal, setShowEditRegModal] = useState(false);
   const [editRegStart, setEditRegStart] = useState('');
   const [editRegEnd, setEditRegEnd] = useState('');
+  const [editMaxParticipants, setEditMaxParticipants] = useState('');
+  const [editMaxTeamMembers, setEditMaxTeamMembers] = useState('');
+  const [editAllowAllMembersSubmit, setEditAllowAllMembersSubmit] = useState(true);
   const [updatingRegWindow, setUpdatingRegWindow] = useState(false);
   const [editRegError, setEditRegError] = useState('');
 
   // Team Registration Form State
   const [teamName, setTeamName] = useState('');
-  const [members, setMembers] = useState('');
+  const [memberNames, setMemberNames] = useState<string[]>(['']);
   const [school, setSchool] = useState('');
   const [registering, setRegistering] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
@@ -44,10 +47,19 @@ export default function ContestDetailPage() {
     api.getContest(id as string)
       .then((data) => {
         setContest(data);
+        const targetSize = data.max_team_members || 3;
         if (data.registration_info) {
           setTeamName(data.registration_info.team_name || '');
-          setMembers(data.registration_info.members || '');
           setSchool(data.registration_info.school || '');
+          let existingMembers = data.registration_info.members
+            ? data.registration_info.members.split(',').map((s: string) => s.trim())
+            : [];
+          while (existingMembers.length < targetSize) {
+            existingMembers.push('');
+          }
+          setMemberNames(existingMembers);
+        } else {
+          setMemberNames(Array(targetSize).fill(''));
         }
       })
       .catch((err) => console.error(err))
@@ -98,18 +110,40 @@ export default function ContestDetailPage() {
       return;
     }
     setErrorMsg('');
+    const targetSize = contest?.max_team_members || 3;
+    let currentList: string[] = [];
+    if (contest?.registration_info?.members) {
+      currentList = contest.registration_info.members.split(',').map((s: string) => s.trim());
+    }
+    while (currentList.length < targetSize) {
+      currentList.push('');
+    }
+    setMemberNames(currentList);
     setShowRegModal(true);
   };
 
   const handleRegisterSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg('');
+
+    const activeMembers = memberNames.map(m => m.trim()).filter(Boolean);
+    if (activeMembers.length === 0) {
+      setErrorMsg('Please enter at least 1 team member name.');
+      return;
+    }
+
+    const maxAllowed = contest?.max_team_members || 3;
+    if (activeMembers.length > maxAllowed) {
+      setErrorMsg(`This contest allows maximum ${maxAllowed} members per team.`);
+      return;
+    }
+
     setRegistering(true);
 
     try {
       await api.registerContest(id as string, {
         team_name: teamName,
-        members,
+        members: activeMembers.join(', '),
         school,
       });
       setSuccessMsg('Team registered successfully!');
@@ -150,6 +184,9 @@ export default function ContestDetailPage() {
     if (contest) {
       setEditRegStart(toLocalISOString(contest.registration_start_time));
       setEditRegEnd(toLocalISOString(contest.registration_end_time));
+      setEditMaxParticipants(contest.max_participants != null ? String(contest.max_participants) : '');
+      setEditMaxTeamMembers(contest.max_team_members != null ? String(contest.max_team_members) : '3');
+      setEditAllowAllMembersSubmit(contest.allow_all_members_submit ?? true);
       setEditRegError('');
       setShowEditRegModal(true);
     }
@@ -172,12 +209,15 @@ export default function ContestDetailPage() {
       await api.updateContest(contest.id, {
         registration_start_time: startD.toISOString(),
         registration_end_time: endD.toISOString(),
+        max_participants: editMaxParticipants ? parseInt(editMaxParticipants, 10) : null,
+        max_team_members: editMaxTeamMembers ? parseInt(editMaxTeamMembers, 10) : 3,
+        allow_all_members_submit: editAllowAllMembersSubmit,
       });
-      setSuccessMsg('Registration window updated successfully!');
+      setSuccessMsg('Registration settings updated successfully!');
       setShowEditRegModal(false);
       fetchContestData();
     } catch (err: any) {
-      setEditRegError(err.message || 'Failed to update registration window.');
+      setEditRegError(err.message || 'Failed to update registration settings.');
     } finally {
       setUpdatingRegWindow(false);
     }
@@ -228,6 +268,8 @@ export default function ContestDetailPage() {
                     ? 'bg-cyan-500/10 text-cyan-400 border-cyan-500/30'
                     : contest.registration_status === 'REGISTRATION_NOT_STARTED'
                     ? 'bg-amber-500/10 text-amber-400 border-amber-500/30'
+                    : contest.registration_status === 'REGISTRATION_FULL'
+                    ? 'bg-rose-500/10 text-rose-400 border-rose-500/30'
                     : 'bg-slate-800 text-slate-400 border-slate-700'
                 }`}
               >
@@ -237,6 +279,8 @@ export default function ContestDetailPage() {
                     ? 'Registration Open'
                     : contest.registration_status === 'REGISTRATION_NOT_STARTED'
                     ? 'Registration Not Started'
+                    : contest.registration_status === 'REGISTRATION_FULL'
+                    ? 'Registration Full'
                     : 'Registration Closed'}
                 </span>
               </span>
@@ -262,7 +306,7 @@ export default function ContestDetailPage() {
               <div className="flex items-center justify-between">
                 <span className="text-cyan-400 font-bold flex items-center space-x-1.5">
                   <Calendar className="w-3.5 h-3.5" />
-                  <span>Allowed Registration Window:</span>
+                  <span>Allowed Registration Window & Capacity:</span>
                 </span>
                 {user?.role === 'organizer' && (
                   <button
@@ -270,13 +314,16 @@ export default function ContestDetailPage() {
                     className="text-[11px] text-cyan-400 hover:text-cyan-300 font-semibold underline flex items-center space-x-1"
                   >
                     <Edit3 className="w-3 h-3" />
-                    <span>Edit Window</span>
+                    <span>Edit Settings</span>
                   </button>
                 )}
               </div>
-              <div className="text-slate-300 grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+              <div className="text-slate-300 grid grid-cols-1 sm:grid-cols-5 gap-2 pt-1">
                 <div>Opens: <span className="text-slate-100 font-semibold">{contest.registration_start_time ? new Date(contest.registration_start_time).toLocaleString() : 'N/A'}</span></div>
                 <div>Closes: <span className="text-slate-100 font-semibold">{contest.registration_end_time ? new Date(contest.registration_end_time).toLocaleString() : 'N/A'}</span></div>
+                <div>Capacity: <span className="text-emerald-400 font-semibold">{contest.registered_count ?? 0} / {contest.max_participants != null ? contest.max_participants : '∞'}</span></div>
+                <div>Max Team Size: <span className="text-amber-400 font-semibold">{contest.max_team_members || 3} Members</span></div>
+                <div>Submissions: <span className={`font-semibold ${contest.allow_all_members_submit !== false ? 'text-cyan-400' : 'text-amber-400'}`}>{contest.allow_all_members_submit !== false ? 'All Team Members' : 'Leader Only'}</span></div>
               </div>
             </div>
 
@@ -328,6 +375,8 @@ export default function ContestDetailPage() {
                     ? 'Register Team'
                     : contest.registration_status === 'REGISTRATION_NOT_STARTED'
                     ? 'Registration Not Open Yet'
+                    : contest.registration_status === 'REGISTRATION_FULL'
+                    ? 'Registration Full'
                     : 'Registration Closed'}
                 </span>
               </button>
@@ -550,17 +599,57 @@ export default function ContestDetailPage() {
                 </div>
               </div>
 
-              <div className="space-y-1.5">
-                <label className="text-xs font-mono font-semibold text-slate-300">Required Team Members (Names) *</label>
-                <textarea
-                  required
-                  rows={3}
-                  value={members}
-                  onChange={(e) => setMembers(e.target.value)}
-                  placeholder="e.g. Alex Chen, Sarah Jenkins, David Kim"
-                  className="w-full bg-slate-950 border border-slate-800 focus:border-emerald-500 rounded-xl px-4 py-2.5 text-xs font-mono text-white outline-none"
-                />
-                <span className="text-[10px] text-slate-500 font-mono">List full names of all required team members.</span>
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-mono font-semibold text-slate-300">
+                    Team Members (Max {contest?.max_team_members || 3} allowed) *
+                  </label>
+                  {memberNames.length < (contest?.max_team_members || 3) && (
+                    <button
+                      type="button"
+                      onClick={() => setMemberNames([...memberNames, ''])}
+                      className="text-[11px] font-mono text-emerald-400 hover:text-emerald-300 flex items-center space-x-1"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>+ Add Team Member</span>
+                    </button>
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  {memberNames.map((name, idx) => (
+                    <div key={idx} className="flex items-center space-x-2">
+                      <div className="relative flex-1">
+                        <Users className="w-3.5 h-3.5 text-slate-500 absolute left-3 top-3" />
+                        <input
+                          type="text"
+                          required={idx === 0}
+                          value={name}
+                          onChange={(e) => {
+                            const updated = [...memberNames];
+                            updated[idx] = e.target.value;
+                            setMemberNames(updated);
+                          }}
+                          placeholder={idx === 0 ? 'Member 1 Name (Team Leader) *' : `Member ${idx + 1} Name`}
+                          className="w-full bg-slate-950 border border-slate-800 focus:border-emerald-500 rounded-xl pl-9 pr-3 py-2 text-xs font-mono text-white outline-none"
+                        />
+                      </div>
+                      {memberNames.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => setMemberNames(memberNames.filter((_, i) => i !== idx))}
+                          className="p-2 text-rose-400 hover:text-rose-300 rounded-xl bg-slate-950 border border-slate-800 hover:bg-rose-500/10 transition-colors"
+                          title="Remove Member"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+                <span className="text-[10px] text-slate-500 font-mono block">
+                  Fill in the full name of each team member participating in this contest.
+                </span>
               </div>
 
               <div className="pt-4 flex items-center justify-end space-x-3">
@@ -591,7 +680,7 @@ export default function ContestDetailPage() {
             <div className="flex items-center justify-between border-b border-slate-800 pb-4">
               <div className="flex items-center space-x-3 text-cyan-400 font-mono font-bold">
                 <Calendar className="w-6 h-6" />
-                <span className="text-base text-white">Edit Registration Window</span>
+                <span className="text-base text-white">Edit Registration Settings</span>
               </div>
               <button
                 onClick={() => setShowEditRegModal(false)}
@@ -628,6 +717,82 @@ export default function ContestDetailPage() {
                   onChange={(e) => setEditRegEnd(e.target.value)}
                   className="w-full bg-slate-950 border border-slate-800 focus:border-cyan-500 rounded-xl px-4 py-2.5 text-xs font-mono text-white outline-none"
                 />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-mono font-semibold text-slate-300">Contest Capacity (Teams)</label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={editMaxParticipants}
+                    onChange={(e) => setEditMaxParticipants(e.target.value)}
+                    placeholder="Optional (blank = unlimited)"
+                    className="w-full bg-slate-950 border border-slate-800 focus:border-cyan-500 rounded-xl px-3.5 py-2 text-xs font-mono text-white outline-none"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-mono font-semibold text-slate-300">Max Team Size</label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="10"
+                    value={editMaxTeamMembers}
+                    onChange={(e) => setEditMaxTeamMembers(e.target.value)}
+                    placeholder="Default: 3"
+                    className="w-full bg-slate-950 border border-slate-800 focus:border-cyan-500 rounded-xl px-3.5 py-2 text-xs font-mono text-white outline-none"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2 pt-2 border-t border-slate-800">
+                <label className="text-xs font-mono font-semibold text-slate-300 block">
+                  Submission Permission
+                </label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <label
+                    onClick={() => setEditAllowAllMembersSubmit(true)}
+                    className={`flex items-center space-x-2.5 p-3 rounded-xl border cursor-pointer transition-all ${
+                      editAllowAllMembersSubmit
+                        ? 'bg-emerald-500/10 border-emerald-500/50 text-white'
+                        : 'bg-slate-950 border-slate-800 text-slate-400 hover:border-slate-700'
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="editSubPermission"
+                      checked={editAllowAllMembersSubmit}
+                      onChange={() => setEditAllowAllMembersSubmit(true)}
+                      className="text-emerald-500 focus:ring-emerald-500"
+                    />
+                    <div>
+                      <div className="text-xs font-mono font-bold text-emerald-400">All Team Members</div>
+                      <div className="text-[10px] text-slate-400 font-sans">Any registered member can submit code.</div>
+                    </div>
+                  </label>
+
+                  <label
+                    onClick={() => setEditAllowAllMembersSubmit(false)}
+                    className={`flex items-center space-x-2.5 p-3 rounded-xl border cursor-pointer transition-all ${
+                      !editAllowAllMembersSubmit
+                        ? 'bg-amber-500/10 border-amber-500/50 text-white'
+                        : 'bg-slate-950 border-slate-800 text-slate-400 hover:border-slate-700'
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="editSubPermission"
+                      checked={!editAllowAllMembersSubmit}
+                      onChange={() => setEditAllowAllMembersSubmit(false)}
+                      className="text-amber-500 focus:ring-amber-500"
+                    />
+                    <div>
+                      <div className="text-xs font-mono font-bold text-amber-400">Team Leader Only</div>
+                      <div className="text-[10px] text-slate-400 font-sans">Only designated team leader can submit code.</div>
+                    </div>
+                  </label>
+                </div>
               </div>
 
               <div className="pt-4 flex items-center justify-end space-x-3">

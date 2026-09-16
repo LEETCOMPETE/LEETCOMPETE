@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { CodeEditor } from '@/components/code-editor';
+import { ProblemStatement } from '@/components/ProblemStatement';
 import {
   FileText,
   Send,
@@ -251,21 +252,21 @@ export default function CodeforcesProblemPage() {
   return (
     <div className="space-y-6 max-w-6xl mx-auto">
       
-      {/* Codeforces Header Navigation */}
+      {/* CodeChef Header Navigation */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-800">
         <div className="flex items-center space-x-3">
           <Link
             href={`/contests/${contestId}`}
-            className="p-2 rounded-lg bg-slate-900 border border-slate-800 hover:border-slate-700 text-slate-400 hover:text-white transition-colors"
+            className="p-2 rounded bg-[#121620] border border-slate-800 hover:border-slate-700 text-slate-400 hover:text-white transition-colors"
             title="Back to Contest Problems"
           >
             <ArrowLeft className="w-4 h-4" />
           </Link>
           <div>
-            <div className="text-xs font-mono text-slate-400">
-              Contest #{contestId} &bull; Problem {problem.difficulty}
+            <div className="text-xs font-mono text-amber-400 font-bold">
+              PROBLEM CODE: {problem.difficulty || 'START101'}
             </div>
-            <h1 className="text-xl sm:text-2xl font-bold font-mono text-white">
+            <h1 className="text-xl sm:text-2xl font-bold font-sans text-white">
               {problem.title}
             </h1>
           </div>
@@ -274,52 +275,52 @@ export default function CodeforcesProblemPage() {
         <div className="flex items-center space-x-2">
           <Link
             href={`/contests/${contestId}/leaderboard`}
-            className="px-3.5 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-200 font-mono text-xs font-semibold transition-all flex items-center space-x-1.5"
+            className="px-3.5 py-1.5 rounded bg-[#121620] hover:bg-slate-800 border border-slate-700 text-slate-200 text-xs font-semibold transition-colors flex items-center space-x-1.5"
           >
             <Trophy className="w-4 h-4 text-amber-400" />
-            <span>Leaderboard</span>
+            <span>Ranklist</span>
           </Link>
         </div>
       </div>
 
-      {/* Codeforces Style Separate Tabs Navigation */}
-      <div className="flex items-center space-x-1 border-b border-slate-800 font-mono text-xs">
+      {/* CodeChef Tabs Navigation */}
+      <div className="flex items-center space-x-1 border-b border-slate-800 text-xs font-semibold">
         <button
           onClick={() => setActiveTab('statement')}
-          className={`px-4 py-2.5 font-bold transition-all border-b-2 flex items-center space-x-2 ${
+          className={`px-4 py-2.5 transition-colors border-b-2 flex items-center space-x-2 ${
             activeTab === 'statement'
-              ? 'border-emerald-500 text-emerald-400 bg-slate-900/50'
-              : 'border-transparent text-slate-400 hover:text-slate-200 hover:bg-slate-900/30'
+              ? 'border-amber-500 text-amber-400 bg-[#121620] font-bold'
+              : 'border-transparent text-slate-400 hover:text-slate-200 hover:bg-slate-800/40'
           }`}
         >
           <FileText className="w-4 h-4" />
-          <span>Problem Statement</span>
+          <span>Statement</span>
         </button>
 
         <button
           onClick={() => setActiveTab('submit')}
-          className={`px-4 py-2.5 font-bold transition-all border-b-2 flex items-center space-x-2 ${
+          className={`px-4 py-2.5 transition-colors border-b-2 flex items-center space-x-2 ${
             activeTab === 'submit'
-              ? 'border-emerald-500 text-emerald-400 bg-slate-900/50'
-              : 'border-transparent text-slate-400 hover:text-slate-200 hover:bg-slate-900/30'
+              ? 'border-amber-500 text-amber-400 bg-[#121620] font-bold'
+              : 'border-transparent text-slate-400 hover:text-slate-200 hover:bg-slate-800/40'
           }`}
         >
           <Send className="w-4 h-4" />
-          <span>Submit Code</span>
+          <span>Submit & IDE</span>
         </button>
 
         <button
           onClick={() => setActiveTab('submissions')}
-          className={`px-4 py-2.5 font-bold transition-all border-b-2 flex items-center space-x-2 ${
+          className={`px-4 py-2.5 transition-colors border-b-2 flex items-center space-x-2 ${
             activeTab === 'submissions'
-              ? 'border-emerald-500 text-emerald-400 bg-slate-900/50'
-              : 'border-transparent text-slate-400 hover:text-slate-200 hover:bg-slate-900/30'
+              ? 'border-amber-500 text-amber-400 bg-[#121620] font-bold'
+              : 'border-transparent text-slate-400 hover:text-slate-200 hover:bg-slate-800/40'
           }`}
         >
           <History className="w-4 h-4" />
           <span>My Submissions</span>
           {submissions.length > 0 && (
-            <span className="px-1.5 py-0.5 rounded-full bg-slate-800 text-[10px] text-slate-300">
+            <span className="px-1.5 py-0.5 rounded bg-slate-800 text-[10px] text-amber-400 font-mono">
               {submissions.length}
             </span>
           )}
@@ -327,45 +328,54 @@ export default function CodeforcesProblemPage() {
       </div>
 
       {/* ======================================================== */}
-      {/* TAB 1: CODEFORCES PROBLEM STATEMENT                      */}
+      {/* TAB 1: CODECHEF PROBLEM STATEMENT                        */}
       {/* ======================================================== */}
       {activeTab === 'statement' && (
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 sm:p-8 space-y-6 shadow-sm">
+        <div className="bg-[#121620] border border-slate-800 rounded-lg p-6 sm:p-8 space-y-6">
           
-          {/* Codeforces Header Specifications Box */}
-          <div className="bg-slate-950 border border-slate-800 rounded-xl p-4 text-center font-mono text-xs space-y-1">
-            <h2 className="text-base font-bold text-white mb-2">{problem.title}</h2>
-            <div className="text-slate-400">Time Limit per Test: <span className="text-slate-200 font-bold">{problem.time_limit_ms / 1000} seconds</span></div>
-            <div className="text-slate-400">Memory Limit: <span className="text-slate-200 font-bold">256 megabytes</span></div>
-            <div className="text-slate-400">Input: <span className="text-slate-200 font-bold">Standard Input (stdin)</span></div>
-            <div className="text-slate-400">Output: <span className="text-slate-200 font-bold">Standard Output (stdout)</span></div>
+          {/* CodeChef Header Specifications Box */}
+          <div className="bg-[#0B1120] border border-slate-800 rounded p-4 text-xs font-mono grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">
+            <div className="space-y-0.5">
+              <span className="text-slate-400 block text-[10px] uppercase">Time Limit</span>
+              <span className="text-white font-bold">{problem.time_limit_ms / 1000} secs</span>
+            </div>
+            <div className="space-y-0.5">
+              <span className="text-slate-400 block text-[10px] uppercase">Memory Limit</span>
+              <span className="text-white font-bold">256 MB</span>
+            </div>
+            <div className="space-y-0.5">
+              <span className="text-slate-400 block text-[10px] uppercase">Source Limit</span>
+              <span className="text-white font-bold">50,000 Bytes</span>
+            </div>
+            <div className="space-y-0.5">
+              <span className="text-slate-400 block text-[10px] uppercase">Difficulty</span>
+              <span className="text-amber-400 font-bold uppercase">{problem.difficulty || 'Easy'}</span>
+            </div>
           </div>
 
           {/* Statement Content */}
           <div className="space-y-4">
-            <h3 className="text-sm font-bold font-mono text-white border-b border-slate-800 pb-2 uppercase tracking-wider">
-              Problem Statement
+            <h3 className="text-sm font-bold font-sans text-white border-b border-slate-800 pb-2 uppercase tracking-wider">
+              Problem Description
             </h3>
-            <div className="prose prose-invert max-w-none text-sm text-slate-300 font-sans leading-relaxed whitespace-pre-wrap">
-              {problem.statement}
-            </div>
+            <ProblemStatement content={problem.statement} section="main" />
           </div>
 
-          {/* Codeforces Sample Test Cases */}
+          {/* CodeChef Sample Test Cases */}
           {problem.sample_test_cases && problem.sample_test_cases.length > 0 && (
             <div className="space-y-4 pt-4 border-t border-slate-800">
-              <h3 className="text-sm font-bold font-mono text-white border-b border-slate-800 pb-2 uppercase tracking-wider">
-                Sample Examples
+              <h3 className="text-sm font-bold font-sans text-white border-b border-slate-800 pb-2 uppercase tracking-wider">
+                Sample Test Cases
               </h3>
 
               {problem.sample_test_cases.map((tc: any, i: number) => (
-                <div key={tc.id} className="border border-slate-800 rounded-xl overflow-hidden font-mono text-xs">
+                <div key={tc.id} className="border border-slate-800 rounded overflow-hidden font-mono text-xs">
                   {/* Sample Header */}
-                  <div className="bg-slate-950 px-4 py-2 border-b border-slate-800 flex items-center justify-between text-slate-400 font-bold">
-                    <span>Example {i + 1}</span>
+                  <div className="bg-[#0B1120] px-4 py-2 border-b border-slate-800 flex items-center justify-between text-slate-300 font-bold">
+                    <span>Sample Input {i + 1}</span>
                     <button
                       onClick={() => handleCopyInput(tc.input, i)}
-                      className="hover:text-emerald-400 text-[11px] flex items-center space-x-1 transition-colors"
+                      className="hover:text-amber-400 text-[11px] flex items-center space-x-1 transition-colors"
                     >
                       {copiedIndex === i ? (
                         <>
@@ -374,7 +384,7 @@ export default function CodeforcesProblemPage() {
                         </>
                       ) : (
                         <>
-                          <Copy className="w-3.5 h-3.5" />
+                          <Copy className="w-3.5 h-3.5 text-slate-400" />
                           <span>Copy Input</span>
                         </>
                       )}
@@ -382,17 +392,17 @@ export default function CodeforcesProblemPage() {
                   </div>
 
                   {/* Input & Output Panels */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 divide-y sm:divide-y-0 sm:divide-x divide-slate-800 bg-slate-950/50">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 divide-y sm:divide-y-0 sm:divide-x divide-slate-800 bg-[#0B1120]">
                     <div className="p-3.5 space-y-1">
-                      <span className="text-[10px] uppercase font-bold text-slate-500 block">Input</span>
-                      <pre className="text-slate-200 font-mono text-xs whitespace-pre-wrap select-all bg-slate-900 p-2 rounded border border-slate-800/80">
+                      <span className="text-[10px] uppercase font-bold text-slate-400 block">Input</span>
+                      <pre className="text-slate-200 font-mono text-xs whitespace-pre-wrap select-all bg-[#121620] p-2 rounded border border-slate-800">
                         {tc.input}
                       </pre>
                     </div>
 
                     <div className="p-3.5 space-y-1">
-                      <span className="text-[10px] uppercase font-bold text-slate-500 block">Output</span>
-                      <pre className="text-emerald-400 font-mono text-xs whitespace-pre-wrap select-all bg-slate-900 p-2 rounded border border-slate-800/80">
+                      <span className="text-[10px] uppercase font-bold text-slate-400 block">Output</span>
+                      <pre className="text-emerald-400 font-mono text-xs whitespace-pre-wrap select-all bg-[#121620] p-2 rounded border border-slate-800">
                         {tc.expected_output}
                       </pre>
                     </div>
@@ -402,15 +412,20 @@ export default function CodeforcesProblemPage() {
             </div>
           )}
 
+          {/* Problem Note Section (Placed after Sample Test Cases) */}
+          <div className="pt-2">
+            <ProblemStatement content={problem.statement} section="note" />
+          </div>
+
           {/* Quick Submit CTA */}
           <div className="pt-4 border-t border-slate-800 flex items-center justify-between">
-            <span className="text-xs font-mono text-slate-400">Ready to solve this problem?</span>
+            <span className="text-xs text-slate-400">Ready to submit your code?</span>
             <button
               onClick={() => setActiveTab('submit')}
-              className="px-5 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-mono text-xs font-bold transition-all flex items-center space-x-2"
+              className="px-5 py-2.5 rounded bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-bold transition-colors flex items-center space-x-2"
             >
               <Send className="w-4 h-4" />
-              <span>Go to Submit Code</span>
+              <span>OPEN IDE & SUBMIT</span>
             </button>
           </div>
 
@@ -574,9 +589,8 @@ export default function CodeforcesProblemPage() {
                 <table className="w-full text-left font-mono text-xs">
                   <thead className="bg-slate-950/80 border-b border-slate-800 text-slate-400 uppercase tracking-wider">
                     <tr>
-                      <th className="px-5 py-3.5">#</th>
                       <th className="px-5 py-3.5">When</th>
-                      <th className="px-5 py-3.5">Participant</th>
+                      <th className="px-5 py-3.5">Team Name</th>
                       <th className="px-5 py-3.5">Language</th>
                       <th className="px-5 py-3.5">Verdict</th>
                       <th className="px-5 py-3.5">Score</th>
@@ -586,12 +600,11 @@ export default function CodeforcesProblemPage() {
                   <tbody className="divide-y divide-slate-800/60">
                     {submissions.map((sub) => (
                       <tr key={sub.id} className="hover:bg-slate-800/40 transition-colors">
-                        <td className="px-5 py-4 font-bold text-slate-400">#{sub.id}</td>
                         <td className="px-5 py-4 text-slate-300">
                           {new Date(sub.submitted_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
                         </td>
                         <td className="px-5 py-4 font-semibold text-white">
-                          {sub.user_name || 'Participant'}
+                          {sub.team_name || sub.user_name || 'Participant'}
                         </td>
                         <td className="px-5 py-4 uppercase text-slate-400">
                           {sub.language}
@@ -615,13 +628,23 @@ export default function CodeforcesProblemPage() {
                         <td className="px-5 py-4 font-bold text-white">
                           {sub.score} / 100
                         </td>
-                        <td className="px-5 py-4 text-right">
+                        <td className="px-5 py-4 text-right space-x-2">
+                          {sub.verdict !== 'AC' && (
+                            <button
+                              onClick={() => setSelectedSubDetail(sub)}
+                              className="px-3 py-1.5 rounded bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30 text-[11px] font-semibold inline-flex items-center space-x-1"
+                              title="View Codeforces Judgement Protocol & Checker Logs"
+                            >
+                              <FileText className="w-3.5 h-3.5 text-amber-400" />
+                              <span>Protocol Log</span>
+                            </button>
+                          )}
                           <button
                             onClick={() => setSelectedSubDetail(sub)}
                             className="px-3 py-1.5 rounded bg-slate-950 hover:bg-slate-800 text-slate-300 border border-slate-800 text-[11px] font-semibold inline-flex items-center space-x-1"
                           >
                             <Eye className="w-3.5 h-3.5 text-emerald-400" />
-                            <span>View Source</span>
+                            <span>View Details</span>
                           </button>
                         </td>
                       </tr>
@@ -678,6 +701,18 @@ export default function CodeforcesProblemPage() {
                 {selectedSubDetail.code}
               </pre>
             </div>
+
+            {selectedSubDetail.verdict !== 'AC' && (
+              <div className="space-y-1.5 font-mono text-xs pt-2 border-t border-slate-800">
+                <span className="text-amber-400 font-bold flex items-center space-x-1">
+                  <FileText className="w-3.5 h-3.5" />
+                  <span>Judgement Protocol & Checker Logs</span>
+                </span>
+                <pre className="p-4 bg-[#0B1120] border border-slate-800 rounded-xl text-slate-300 text-xs overflow-x-auto whitespace-pre-wrap leading-relaxed max-h-72">
+                  {selectedSubDetail.judgement_protocol || `→ Judgement Protocol\nTest: #1, verdict: ${selectedSubDetail.verdict === 'WA' ? 'WRONG_ANSWER' : selectedSubDetail.verdict}\nChecker Log\nSubmission verdict: ${selectedSubDetail.verdict}`}
+                </pre>
+              </div>
+            )}
 
             <div className="pt-2 text-right">
               <button

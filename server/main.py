@@ -1,3 +1,6 @@
+from dotenv import load_dotenv
+load_dotenv()
+
 from datetime import datetime, timedelta
 from typing import List, Optional
 from fastapi import FastAPI, Depends, HTTPException, status, Query
@@ -8,11 +11,36 @@ from database import engine, Base, get_db
 import models
 import schemas
 import auth
+import codeforces_importer
 from judge import run_test_case
 from seed import seed_database
 
 # Create DB tables
 Base.metadata.create_all(bind=engine)
+
+# Auto-migrate missing columns for SQLite
+from sqlalchemy import text
+with engine.connect() as conn:
+    try:
+        conn.execute(text("ALTER TABLE contests ADD COLUMN max_participants INTEGER"))
+        conn.commit()
+    except Exception:
+        pass  # Column already exists
+    try:
+        conn.execute(text("ALTER TABLE contests ADD COLUMN max_team_members INTEGER DEFAULT 3"))
+        conn.commit()
+    except Exception:
+        pass  # Column already exists
+    try:
+        conn.execute(text("ALTER TABLE contests ADD COLUMN allow_all_members_submit BOOLEAN DEFAULT 1"))
+        conn.commit()
+    except Exception:
+        pass  # Column already exists
+    try:
+        conn.execute(text("ALTER TABLE contests ADD COLUMN show_checker_logs BOOLEAN DEFAULT 0"))
+        conn.commit()
+    except Exception:
+        pass  # Column already exists
 
 app = FastAPI(title="LeetCompete API", version="1.0.0")
 
@@ -43,12 +71,12 @@ def register(user_data: schemas.UserRegister, db: Session = Depends(get_db)):
     if existing:
         raise HTTPException(status_code=400, detail="Email is already registered")
 
-    role = user_data.role if user_data.role in ["organizer", "participant"] else "participant"
+    # Public self-registration ALWAYS creates participant accounts
     user = models.User(
         name=user_data.name,
         email=user_data.email,
         password_hash=auth.hash_password(user_data.password),
-        role=role
+        role="participant"
     )
     db.add(user)
     db.commit()
@@ -71,6 +99,75 @@ def get_me(current_user: models.User = Depends(auth.get_current_user)):
     return current_user
 
 # ----------------------------
+# Admin User Management Endpoints
+# ----------------------------
+
+@app.get("/admin/users", response_model=List[schemas.UserDetailResponse])
+def list_users(
+    db: Session = Depends(get_db),
+    organizer: models.User = Depends(auth.require_organizer)
+):
+    return db.query(models.User).order_by(models.User.created_at.desc()).all()
+
+@app.post("/admin/users", response_model=schemas.UserDetailResponse)
+def create_user_by_admin(
+    user_data: schemas.UserAdminCreate,
+    db: Session = Depends(get_db),
+    organizer: models.User = Depends(auth.require_organizer)
+):
+    existing = db.query(models.User).filter(models.User.email == user_data.email).first()
+    if existing:
+        raise HTTPException(status_code=400, detail="Email is already registered")
+
+    role = user_data.role if user_data.role in ["organizer", "participant"] else "participant"
+    user = models.User(
+        name=user_data.name,
+        email=user_data.email,
+        password_hash=auth.hash_password(user_data.password),
+        role=role
+    )
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    return user
+
+@app.put("/admin/users/{user_id}/role", response_model=schemas.UserDetailResponse)
+def update_user_role(
+    user_id: int,
+    role_data: schemas.UserRoleUpdate,
+    db: Session = Depends(get_db),
+    organizer: models.User = Depends(auth.require_organizer)
+):
+    user = db.query(models.User).filter(models.User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    if role_data.role not in ["organizer", "participant"]:
+        raise HTTPException(status_code=400, detail="Invalid role specified. Must be 'organizer' or 'participant'")
+
+    user.role = role_data.role
+    db.commit()
+    db.refresh(user)
+    return user
+
+@app.delete("/admin/users/{user_id}")
+def delete_user(
+    user_id: int,
+    db: Session = Depends(get_db),
+    organizer: models.User = Depends(auth.require_organizer)
+):
+    if user_id == organizer.id:
+        raise HTTPException(status_code=400, detail="You cannot delete your own active organizer account")
+
+    user = db.query(models.User).filter(models.User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    db.delete(user)
+    db.commit()
+    return {"message": f"User {user.name} (ID: {user_id}) deleted successfully"}
+
+# ----------------------------
 # Contest Endpoints
 # ----------------------------
 
@@ -83,21 +180,50 @@ def get_contest_status(contest: models.Contest) -> str:
     else:
         return "UPCOMING"
 
-def get_registration_status(contest: models.Contest) -> str:
+def get_registration_status(contest: models.Contest, db: Optional[Session] = None) -> str:
     now = datetime.utcnow()
     reg_start = contest.registration_start_time or (contest.start_time - timedelta(days=7))
-    reg_end = contest.registration_end_time or contest.end_time or (contest.start_time + timedelta(days=1))
+    
+    # Registration closes automatically when the contest starts
+    reg_end = contest.registration_end_time or contest.start_time
+    if reg_end > contest.start_time:
+        reg_end = contest.start_time
 
     # Guard against invalid reg_end <= reg_start
     if reg_end <= reg_start:
-        reg_end = contest.end_time or (contest.start_time + timedelta(days=1))
+        reg_end = contest.start_time
 
     if now < reg_start:
         return "REGISTRATION_NOT_STARTED"
-    elif reg_start <= now <= reg_end:
-        return "REGISTRATION_OPEN"
-    else:
+    elif now >= contest.start_time or now >= reg_end:
         return "REGISTRATION_CLOSED"
+
+    # Capacity check if db is provided
+    if contest.max_participants and contest.max_participants > 0 and db is not None:
+        reg_count = db.query(models.Registration).filter(models.Registration.contest_id == contest.id).count()
+        if reg_count >= contest.max_participants:
+            return "REGISTRATION_FULL"
+
+    return "REGISTRATION_OPEN"
+
+def get_user_registration(contest_id: int, user: models.User, db: Session):
+    # 1. Direct registration by user_id (Team Leader)
+    reg = db.query(models.Registration).filter(
+        models.Registration.contest_id == contest_id,
+        models.Registration.user_id == user.id
+    ).first()
+    if reg:
+        return reg, True
+
+    # 2. Match user name or email in any team's member list (Team Member)
+    all_regs = db.query(models.Registration).filter(models.Registration.contest_id == contest_id).all()
+    for r in all_regs:
+        if r.members:
+            members_list = [m.strip().lower() for m in r.members.split(',') if m.strip()]
+            if user.name.lower() in members_list or user.email.lower() in members_list:
+                return r, False
+
+    return None, False
 
 def check_problem_access(contest_id: int, user: Optional[models.User], db: Session):
     if not user:
@@ -112,10 +238,7 @@ def check_problem_access(contest_id: int, user: Optional[models.User], db: Sessi
     if not contest:
         raise HTTPException(status_code=404, detail="Contest not found")
 
-    reg = db.query(models.Registration).filter(
-        models.Registration.contest_id == contest_id,
-        models.Registration.user_id == user.id
-    ).first()
+    reg, is_leader = get_user_registration(contest_id, user, db)
     if not reg:
         raise HTTPException(
             status_code=403,
@@ -140,8 +263,9 @@ def list_contests(db: Session = Depends(get_db), current_user: Optional[models.U
                 models.Registration.user_id == current_user.id
             ).first()
         
+        reg_count = db.query(models.Registration).filter(models.Registration.contest_id == c.id).count()
         status_str = get_contest_status(c)
-        reg_status = get_registration_status(c)
+        reg_status = get_registration_status(c, db)
 
         reg_info = None
         if reg_record:
@@ -163,6 +287,10 @@ def list_contests(db: Session = Depends(get_db), current_user: Optional[models.U
             end_time=c.end_time,
             registration_start_time=c.registration_start_time,
             registration_end_time=c.registration_end_time,
+            max_participants=c.max_participants,
+            max_team_members=getattr(c, 'max_team_members', 3) or 3,
+            allow_all_members_submit=getattr(c, 'allow_all_members_submit', True) if getattr(c, 'allow_all_members_submit', None) is not None else True,
+            registered_count=reg_count,
             created_by=c.created_by,
             status=status_str,
             is_launched=c.is_launched or False,
@@ -179,10 +307,11 @@ def create_contest(
     organizer: models.User = Depends(auth.require_organizer)
 ):
     reg_start = contest_data.registration_start_time or datetime.utcnow()
-    reg_end = contest_data.registration_end_time or contest_data.end_time or contest_data.start_time
-
+    reg_end = contest_data.registration_end_time or contest_data.start_time
+    if reg_end > contest_data.start_time:
+        reg_end = contest_data.start_time
     if reg_end <= reg_start:
-        reg_end = contest_data.end_time or (contest_data.start_time + timedelta(days=1))
+        reg_end = contest_data.start_time
 
     contest = models.Contest(
         title=contest_data.title,
@@ -191,6 +320,9 @@ def create_contest(
         end_time=contest_data.end_time,
         registration_start_time=reg_start,
         registration_end_time=reg_end,
+        max_participants=contest_data.max_participants,
+        max_team_members=contest_data.max_team_members if contest_data.max_team_members is not None else 3,
+        allow_all_members_submit=contest_data.allow_all_members_submit if contest_data.allow_all_members_submit is not None else True,
         is_launched=False,
         created_by=organizer.id
     )
@@ -206,10 +338,14 @@ def create_contest(
         end_time=contest.end_time,
         registration_start_time=contest.registration_start_time,
         registration_end_time=contest.registration_end_time,
+        max_participants=contest.max_participants,
+        max_team_members=contest.max_team_members or 3,
+        allow_all_members_submit=contest.allow_all_members_submit if getattr(contest, 'allow_all_members_submit', None) is not None else True,
+        registered_count=0,
         created_by=contest.created_by,
         status=get_contest_status(contest),
         is_launched=contest.is_launched,
-        registration_status=get_registration_status(contest),
+        registration_status=get_registration_status(contest, db),
         is_registered=False
     )
 
@@ -236,12 +372,19 @@ def update_contest(
         contest.registration_start_time = contest_data.registration_start_time
     if contest_data.registration_end_time is not None:
         contest.registration_end_time = contest_data.registration_end_time
+    if contest_data.max_participants is not None:
+        contest.max_participants = contest_data.max_participants
+    if contest_data.max_team_members is not None:
+        contest.max_team_members = contest_data.max_team_members
+    if contest_data.allow_all_members_submit is not None:
+        contest.allow_all_members_submit = contest_data.allow_all_members_submit
 
-    if contest.registration_end_time and contest.registration_start_time and contest.registration_end_time <= contest.registration_start_time:
-        contest.registration_end_time = contest.end_time
+    if contest.registration_end_time and contest.registration_end_time > contest.start_time:
+        contest.registration_end_time = contest.start_time
 
     db.commit()
     db.refresh(contest)
+    reg_count = db.query(models.Registration).filter(models.Registration.contest_id == contest.id).count()
 
     return schemas.ContestResponse(
         id=contest.id,
@@ -251,10 +394,14 @@ def update_contest(
         end_time=contest.end_time,
         registration_start_time=contest.registration_start_time,
         registration_end_time=contest.registration_end_time,
+        max_participants=contest.max_participants,
+        max_team_members=contest.max_team_members or 3,
+        allow_all_members_submit=contest.allow_all_members_submit if getattr(contest, 'allow_all_members_submit', None) is not None else True,
+        registered_count=reg_count,
         created_by=contest.created_by,
         status=get_contest_status(contest),
         is_launched=contest.is_launched,
-        registration_status=get_registration_status(contest),
+        registration_status=get_registration_status(contest, db),
         is_registered=False
     )
 
@@ -272,6 +419,7 @@ def launch_contest(
     contest.is_launched = True
     db.commit()
     db.refresh(contest)
+    reg_count = db.query(models.Registration).filter(models.Registration.contest_id == contest.id).count()
 
     return schemas.ContestResponse(
         id=contest.id,
@@ -281,10 +429,14 @@ def launch_contest(
         end_time=contest.end_time,
         registration_start_time=contest.registration_start_time,
         registration_end_time=contest.registration_end_time,
+        max_participants=contest.max_participants,
+        max_team_members=contest.max_team_members or 3,
+        allow_all_members_submit=contest.allow_all_members_submit if getattr(contest, 'allow_all_members_submit', None) is not None else True,
+        registered_count=reg_count,
         created_by=contest.created_by,
         status=get_contest_status(contest),
         is_launched=contest.is_launched,
-        registration_status=get_registration_status(contest),
+        registration_status=get_registration_status(contest, db),
         is_registered=False
     )
 
@@ -300,6 +452,8 @@ def get_contest(contest_id: int, db: Session = Depends(get_db), current_user: Op
             models.Registration.contest_id == contest.id,
             models.Registration.user_id == current_user.id
         ).first()
+
+    reg_count = db.query(models.Registration).filter(models.Registration.contest_id == contest.id).count()
 
     reg_info = None
     if reg_record:
@@ -340,10 +494,14 @@ def get_contest(contest_id: int, db: Session = Depends(get_db), current_user: Op
         end_time=contest.end_time,
         registration_start_time=contest.registration_start_time,
         registration_end_time=contest.registration_end_time,
+        max_participants=contest.max_participants,
+        max_team_members=contest.max_team_members or 3,
+        allow_all_members_submit=contest.allow_all_members_submit if getattr(contest, 'allow_all_members_submit', None) is not None else True,
+        registered_count=reg_count,
         created_by=contest.created_by,
         status=get_contest_status(contest),
         is_launched=contest.is_launched or False,
-        registration_status=get_registration_status(contest),
+        registration_status=get_registration_status(contest, db),
         is_registered=reg_record is not None,
         registration_info=reg_info,
         problems=problem_responses
@@ -374,7 +532,28 @@ def register_for_contest(
     if not contest:
         raise HTTPException(status_code=404, detail="Contest not found")
 
-    reg_status = get_registration_status(contest)
+    # Validate max_team_members limit
+    max_members = contest.max_team_members or 3
+    parsed_members = [m.strip() for m in reg_data.members.split(',') if m.strip()]
+    if len(parsed_members) > max_members:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Team size exceeds the maximum limit of {max_members} members per team allowed for this contest."
+        )
+
+    existing = db.query(models.Registration).filter(
+        models.Registration.contest_id == contest_id,
+        models.Registration.user_id == current_user.id
+    ).first()
+
+    if existing:
+        existing.team_name = reg_data.team_name
+        existing.members = reg_data.members
+        existing.school = reg_data.school
+        db.commit()
+        return {"message": "Team registration updated successfully"}
+
+    reg_status = get_registration_status(contest, db)
     if reg_status == "REGISTRATION_NOT_STARTED":
         start_str = contest.registration_start_time.strftime("%Y-%m-%d %H:%M UTC") if contest.registration_start_time else "the scheduled window"
         raise HTTPException(
@@ -384,7 +563,12 @@ def register_for_contest(
     elif reg_status == "REGISTRATION_CLOSED":
         raise HTTPException(
             status_code=400,
-            detail="Registration for this contest has closed."
+            detail="Registration for this contest has closed (registration closes automatically when the contest starts)."
+        )
+    elif reg_status == "REGISTRATION_FULL":
+        raise HTTPException(
+            status_code=400,
+            detail=f"Registration is full for this contest. Maximum limit of {contest.max_participants} teams reached."
         )
 
     existing = db.query(models.Registration).filter(
@@ -409,6 +593,33 @@ def register_for_contest(
     db.add(registration)
     db.commit()
     return {"message": "Team registered successfully"}
+
+@app.get("/contests/{contest_id}/registrations", response_model=List[schemas.ContestRegistrationDetail])
+def get_contest_registrations(
+    contest_id: int,
+    db: Session = Depends(get_db),
+    organizer: models.User = Depends(auth.require_organizer)
+):
+    contest = db.query(models.Contest).filter(models.Contest.id == contest_id).first()
+    if not contest:
+        raise HTTPException(status_code=404, detail="Contest not found")
+
+    registrations = db.query(models.Registration).filter(models.Registration.contest_id == contest_id).all()
+    results = []
+    for r in registrations:
+        u = db.query(models.User).filter(models.User.id == r.user_id).first()
+        results.append(schemas.ContestRegistrationDetail(
+            id=r.id,
+            contest_id=r.contest_id,
+            user_id=r.user_id,
+            user_name=u.name if u else f"User #{r.user_id}",
+            user_email=u.email if u else "N/A",
+            team_name=r.team_name,
+            members=r.members,
+            school=r.school,
+            registered_at=r.registered_at
+        ))
+    return results
 
 # ----------------------------
 # Problem Endpoints
@@ -477,6 +688,158 @@ def create_problem(
         sample_test_cases=sample_cases
     )
 
+@app.post("/contests/{contest_id}/import-codeforces", response_model=schemas.ProblemDetailResponse)
+def import_codeforces_problem(
+    contest_id: int,
+    import_data: schemas.CodeforcesImportRequest,
+    db: Session = Depends(get_db),
+    organizer: models.User = Depends(auth.require_organizer)
+):
+    contest = db.query(models.Contest).filter(models.Contest.id == contest_id).first()
+    if not contest:
+        raise HTTPException(status_code=404, detail="Contest not found")
+
+    try:
+        cf_data = codeforces_importer.fetch_codeforces_problem(import_data.url)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    problem = models.Problem(
+        contest_id=contest_id,
+        title=cf_data["title"],
+        statement=cf_data["statement"],
+        time_limit_ms=cf_data["time_limit_ms"],
+        difficulty=cf_data["difficulty"]
+    )
+    db.add(problem)
+    db.commit()
+    db.refresh(problem)
+
+    test_case_models = []
+    for tc in cf_data["sample_tests"]:
+        t = models.TestCase(
+            problem_id=problem.id,
+            input=tc["input"],
+            expected_output=tc["expected_output"],
+            is_sample=True
+        )
+        db.add(t)
+        test_case_models.append(t)
+
+    db.commit()
+
+    sample_cases = [
+        schemas.TestCaseResponse(
+            id=tc.id,
+            input=tc.input,
+            expected_output=tc.expected_output,
+            is_sample=tc.is_sample
+        ) for tc in test_case_models
+    ]
+
+    return schemas.ProblemDetailResponse(
+        id=problem.id,
+        contest_id=problem.contest_id,
+        title=problem.title,
+        statement=problem.statement,
+        time_limit_ms=problem.time_limit_ms,
+        difficulty=problem.difficulty,
+        sample_test_cases=sample_cases
+    )
+
+import json
+
+def parse_json_test_cases_data(content: str) -> List[dict]:
+    try:
+        data = json.loads(content)
+    except Exception as e:
+        raise ValueError(f"Invalid JSON format: {str(e)}")
+
+    test_cases_list = []
+
+    if isinstance(data, list):
+        items = data
+    elif isinstance(data, dict):
+        if "test_cases" in data and isinstance(data["test_cases"], list):
+            items = data["test_cases"]
+        elif "tests" in data and isinstance(data["tests"], list):
+            items = data["tests"]
+        elif "data" in data and isinstance(data["data"], list):
+            items = data["data"]
+        elif "samples" in data and isinstance(data["samples"], list):
+            items = data["samples"]
+        else:
+            items = [data]
+    else:
+        raise ValueError("JSON must be an array of test cases or an object containing test cases.")
+
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+
+        inp = (
+            item.get("input")
+            if item.get("input") is not None
+            else item.get("in")
+            if item.get("in") is not None
+            else item.get("stdin")
+            if item.get("stdin") is not None
+            else item.get("input_str")
+            if item.get("input_str") is not None
+            else ""
+        )
+        outp = (
+            item.get("expected_output")
+            if item.get("expected_output") is not None
+            else item.get("output")
+            if item.get("output") is not None
+            else item.get("out")
+            if item.get("out") is not None
+            else item.get("stdout")
+            if item.get("stdout") is not None
+            else item.get("expected")
+            if item.get("expected") is not None
+            else ""
+        )
+        is_sample = bool(
+            item.get("is_sample")
+            or item.get("sample")
+            or False
+        )
+
+        test_cases_list.append({
+            "input": str(inp),
+            "expected_output": str(outp),
+            "is_sample": is_sample
+        })
+
+    if not test_cases_list:
+        raise ValueError("No valid test cases found in JSON.")
+
+    return test_cases_list
+
+@app.post("/parse-codeforces")
+def parse_codeforces_problem_standalone(
+    body: schemas.CodeforcesImportRequest,
+    organizer: models.User = Depends(auth.require_organizer)
+):
+    try:
+        data = codeforces_importer.fetch_codeforces_problem(body.url)
+        return data
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@app.post("/parse-test-cases-json")
+def parse_test_cases_json_standalone(
+    body: schemas.JSONTestCaseParseRequest,
+    organizer: models.User = Depends(auth.require_organizer)
+):
+    try:
+        parsed = parse_json_test_cases_data(body.json_content)
+        return {"test_cases": parsed, "count": len(parsed)}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
 @app.get("/problems/{problem_id}", response_model=schemas.ProblemDetailResponse)
 def get_problem(
     problem_id: int,
@@ -525,6 +888,17 @@ def submit_code(
 ):
     check_problem_access(submission_data.contest_id, current_user, db)
 
+    reg, is_leader = get_user_registration(submission_data.contest_id, current_user, db)
+
+    # Submission Permission Check (All Team Members vs Leader Only)
+    contest = db.query(models.Contest).filter(models.Contest.id == submission_data.contest_id).first()
+    if contest and current_user.role != "organizer":
+        if getattr(contest, 'allow_all_members_submit', True) is False and not is_leader:
+            raise HTTPException(
+                status_code=403,
+                detail="Submission restricted: Only the team leader is permitted to submit code for this contest."
+            )
+
     if not submission_data.code or not submission_data.code.strip():
         raise HTTPException(
             status_code=400,
@@ -541,26 +915,48 @@ def submit_code(
 
     tc_results = []
     overall_verdict = "AC"
-    
-    for tc in test_cases:
+    protocol_lines = ["→ Judgement Protocol"]
+    for idx, tc in enumerate(test_cases, start=1):
         res = run_test_case(
             code=submission_data.code,
             language=submission_data.language,
             input_str=tc.input,
             expected_output_str=tc.expected_output,
-            time_limit_ms=problem.time_limit_ms
+            time_limit_ms=problem.time_limit_ms,
+            problem_id=problem.id
         )
         tc_results.append(schemas.TestCaseResult(
             test_case_id=tc.id,
             is_sample=tc.is_sample,
             status=res["status"],
+            input_str=tc.input if (tc.is_sample or (contest and contest.show_checker_logs)) else None,
             user_output=res["user_output"],
-            expected_output=res["expected_output"],
+            expected_output=tc.expected_output if (tc.is_sample or (contest and contest.show_checker_logs)) else None,
             execution_time_ms=res["execution_time_ms"],
             error=res["error"]
         ))
         if res["status"] != "AC" and overall_verdict == "AC":
             overall_verdict = res["status"]
+
+        exec_time = int(res["execution_time_ms"] or 0)
+        if res["status"] == "AC":
+            protocol_lines.append(f"Test: #{idx}, time: {exec_time} ms., memory: 0 KB, exit code: 0, verdict: OK")
+            protocol_lines.append("Copy\nInput\n" + (tc.input if tc.input else ""))
+            protocol_lines.append("Copy\nOutput\n" + (res["user_output"].strip() if res["user_output"] else ""))
+            protocol_lines.append("Copy\nAnswer\n" + (tc.expected_output.strip() if tc.expected_output else ""))
+            protocol_lines.append(f'Checker Log\nok 2 number(s): "{res["user_output"].strip() if res["user_output"] else ""}"\n')
+        else:
+            verdict_str = "WRONG_ANSWER" if res["status"] == "WA" else res["status"]
+            protocol_lines.append(f"Test: #{idx}, time: {exec_time} ms., memory: 0 KB, exit code: 1, verdict: {verdict_str}")
+            protocol_lines.append("Copy\nInput\n" + (tc.input if tc.input else ""))
+            protocol_lines.append("Copy\nOutput\n" + (res["user_output"].strip() if res["user_output"] else ""))
+            protocol_lines.append("Copy\nAnswer\n" + (tc.expected_output.strip() if tc.expected_output else ""))
+            err_msg = res["error"] or f"wrong answer 1st numbers differ - expected: '{tc.expected_output.strip()}', found: '{res['user_output'].strip()}'"
+            protocol_lines.append(f"Checker Log\n{err_msg}\n")
+
+    judgement_protocol_text = None
+    if overall_verdict != "AC":
+        judgement_protocol_text = "\n".join(protocol_lines)
 
     score = 100.0 if overall_verdict == "AC" else 0.0
 
@@ -577,10 +973,13 @@ def submit_code(
     db.commit()
     db.refresh(submission)
 
+    team_name = reg.team_name if (reg and reg.team_name) else None
+
     return schemas.SubmissionResponse(
         id=submission.id,
         user_id=submission.user_id,
         user_name=current_user.name,
+        team_name=team_name,
         problem_id=submission.problem_id,
         problem_title=problem.title,
         contest_id=submission.contest_id,
@@ -589,7 +988,8 @@ def submit_code(
         verdict=submission.verdict,
         score=submission.score,
         submitted_at=submission.submitted_at,
-        test_case_results=tc_results
+        test_case_results=tc_results,
+        judgement_protocol=judgement_protocol_text
     )
 
 @app.get("/submissions", response_model=List[schemas.SubmissionResponse])
@@ -612,10 +1012,14 @@ def get_submissions(
     for s in submissions:
         user = db.query(models.User).filter(models.User.id == s.user_id).first()
         prob = db.query(models.Problem).filter(models.Problem.id == s.problem_id).first()
+        reg, _ = get_user_registration(s.contest_id, user, db) if user else (None, False)
+        team_name = reg.team_name if (reg and reg.team_name) else None
+
         results.append(schemas.SubmissionResponse(
             id=s.id,
             user_id=s.user_id,
             user_name=user.name if user else "Unknown User",
+            team_name=team_name,
             problem_id=s.problem_id,
             problem_title=prob.title if prob else "Problem",
             contest_id=s.contest_id,
@@ -623,7 +1027,8 @@ def get_submissions(
             code=s.code,
             verdict=s.verdict,
             score=s.score,
-            submitted_at=s.submitted_at
+            submitted_at=s.submitted_at,
+            judgement_protocol=None
         ))
     return results
 
