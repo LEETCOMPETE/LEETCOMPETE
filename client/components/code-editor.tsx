@@ -38,6 +38,7 @@ export function CodeEditor({
   const isVimEnabled = externalVimMode !== undefined ? externalVimMode : internalVimMode;
 
   const editorRef = useRef<any>(null);
+  const monacoRef = useRef<any>(null);
   const statusNodeRef = useRef<HTMLDivElement>(null);
   const vimAdapterRef = useRef<any>(null);
 
@@ -50,8 +51,12 @@ export function CodeEditor({
       ? 'java'
       : 'javascript';
 
-  const handleEditorDidMount = (editor: any) => {
+  const handleEditorDidMount = (editor: any, monaco: any) => {
     editorRef.current = editor;
+    monacoRef.current = monaco;
+    if (typeof window !== 'undefined' && monaco) {
+      (window as any).monaco = monaco;
+    }
     attachVim(editor, isVimEnabled);
   };
 
@@ -91,7 +96,16 @@ export function CodeEditor({
 
     if (enabled) {
       try {
+        if (monacoRef.current && !(window as any).monaco) {
+          (window as any).monaco = monacoRef.current;
+        }
+
         await loadVimScript();
+
+        if (monacoRef.current && !(window as any).monaco) {
+          (window as any).monaco = monacoRef.current;
+        }
+
         if (editorRef.current && statusNodeRef.current && (window as any).MonacoVim) {
           vimAdapterRef.current = (window as any).MonacoVim.initVimMode(
             editorRef.current,
