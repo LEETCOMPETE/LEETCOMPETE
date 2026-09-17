@@ -1,0 +1,26 @@
+FROM python:3.10-slim
+
+# Install system compilers and runtimes for judge code execution (C++, Java, Node.js, Python)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    g++ \
+    gcc \
+    default-jdk \
+    nodejs \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app/server
+
+# Copy requirements and install python dependencies
+COPY server/requirements.txt ./
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy server codebase
+COPY server ./
+
+# Expose FastAPI backend port
+EXPOSE 8000
+
+# Start Uvicorn backend server
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]

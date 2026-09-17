@@ -1,0 +1,27 @@
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.server
+    container_name: leetcompete-backend
+    restart: always
+    ports:
+      - "8000:8000"
+    environment:
+      - JWT_SECRET=leetcompete-production-secret-key-2026
+      - DATABASE_URL=sqlite:///./leetcompete.db
+    volumes:
+      - ./server/leetcompete.db:/app/server/leetcompete.db
+
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.client
+      args:
+        - NEXT_PUBLIC_API_URL=/api
+    container_name: leetcompete-frontend
+    restart: always
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
