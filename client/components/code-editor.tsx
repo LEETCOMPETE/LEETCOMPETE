@@ -72,14 +72,25 @@ export function CodeEditor({
       }
       const existingScript = document.getElementById('monaco-vim-script');
       if (existingScript) {
-        existingScript.addEventListener('load', () => resolve());
+        if ((window as any).MonacoVim) {
+          resolve();
+        } else {
+          existingScript.addEventListener('load', () => resolve());
+        }
         return;
       }
       const script = document.createElement('script');
       script.id = 'monaco-vim-script';
-      script.src = 'https://unpkg.com/monaco-vim/dist/monaco-vim.js';
+      script.src = '/monaco-vim.js';
       script.onload = () => resolve();
-      script.onerror = (err) => reject(err);
+      script.onerror = () => {
+        // Fallback to jsDelivr CDN if local asset fails
+        const fallbackScript = document.createElement('script');
+        fallbackScript.src = 'https://cdn.jsdelivr.net/npm/monaco-vim/dist/monaco-vim.js';
+        fallbackScript.onload = () => resolve();
+        fallbackScript.onerror = (err) => reject(err);
+        document.body.appendChild(fallbackScript);
+      };
       document.body.appendChild(script);
     });
   };
