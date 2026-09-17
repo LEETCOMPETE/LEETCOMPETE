@@ -65,7 +65,7 @@ export default function ContestsListPage() {
           />
         </div>
 
-        <div className="flex items-center space-x-1 text-xs font-semibold">
+        <div className="flex items-center space-x-1 text-xs font-semibold overflow-x-auto max-w-full pb-1 sm:pb-0">
           {[
             { id: 'ALL', label: 'All Contests' },
             { id: 'LIVE', label: '● Present (Live)' },
@@ -75,7 +75,7 @@ export default function ContestsListPage() {
             <button
               key={st.id}
               onClick={() => setFilterStatus(st.id)}
-              className={`px-3 py-1.5 rounded transition-colors ${
+              className={`px-3 py-1.5 rounded transition-colors whitespace-nowrap ${
                 filterStatus === st.id
                   ? 'bg-amber-500 text-slate-950 font-bold'
                   : 'bg-slate-100 dark:bg-[#0B1120] text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-slate-700/80 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200 dark:hover:bg-slate-800'

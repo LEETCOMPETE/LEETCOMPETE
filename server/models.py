@@ -44,7 +44,8 @@ class Problem(Base):
     __tablename__ = "problems"
 
     id = Column(Integer, primary_key=True, index=True)
-    contest_id = Column(Integer, ForeignKey("contests.id"), nullable=False)
+    contest_id = Column(Integer, ForeignKey("contests.id"), nullable=True)
+    is_published = Column(Boolean, default=False)  # True = visible in general Problems section for practice
     title = Column(String(200), nullable=False)
     statement = Column(Text, nullable=False)
     time_limit_ms = Column(Integer, default=2000)
@@ -71,11 +72,12 @@ class Submission(Base):
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     problem_id = Column(Integer, ForeignKey("problems.id"), nullable=False)
-    contest_id = Column(Integer, ForeignKey("contests.id"), nullable=False)
+    contest_id = Column(Integer, ForeignKey("contests.id"), nullable=True)
     language = Column(String(50), nullable=False)
     code = Column(Text, nullable=False)
     verdict = Column(String(50), default="Pending")  # AC, WA, TLE, RE, CE, Pending
     score = Column(Float, default=0.0)
+    judgement_protocol = Column(Text, nullable=True)
     submitted_at = Column(DateTime, default=datetime.utcnow)
 
     user = relationship("User", back_populates="submissions")

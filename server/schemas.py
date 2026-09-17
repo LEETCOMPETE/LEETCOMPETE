@@ -92,15 +92,43 @@ class ProblemCreate(BaseModel):
     statement: str
     time_limit_ms: int = 2000
     difficulty: str = "Medium"
+    contest_id: Optional[int] = None
+    is_published: Optional[bool] = True
     test_cases: List[TestCaseCreate] = []
 
 class ProblemResponse(BaseModel):
     id: int
-    contest_id: int
+    contest_id: Optional[int] = None
+    is_published: bool = False
     title: str
     statement: str
     time_limit_ms: int
     difficulty: str
+
+    class Config:
+        from_attributes = True
+
+class ProblemUpdate(BaseModel):
+    title: Optional[str] = None
+    statement: Optional[str] = None
+    time_limit_ms: Optional[int] = None
+    difficulty: Optional[str] = None
+    contest_id: Optional[int] = None
+    is_published: Optional[bool] = None
+    test_cases: Optional[List[TestCaseCreate]] = None
+
+class ProblemWithDetailsResponse(BaseModel):
+    id: int
+    contest_id: Optional[int] = None
+    contest_title: Optional[str] = None
+    is_published: bool = False
+    title: str
+    statement: str
+    time_limit_ms: int
+    difficulty: str
+    test_cases_count: int = 0
+    sample_test_cases: List[TestCaseResponse] = []
+    all_test_cases: List[TestCaseResponse] = []
 
     class Config:
         from_attributes = True
@@ -168,7 +196,7 @@ class ContestDetailResponse(ContestResponse):
 
 # Submission Schemas
 class SubmissionCreate(BaseModel):
-    contest_id: int
+    contest_id: Optional[int] = None
     problem_id: int
     language: str
     code: str
@@ -190,7 +218,7 @@ class SubmissionResponse(BaseModel):
     team_name: Optional[str] = None
     problem_id: int
     problem_title: Optional[str] = None
-    contest_id: int
+    contest_id: Optional[int] = None
     language: str
     code: str
     verdict: str

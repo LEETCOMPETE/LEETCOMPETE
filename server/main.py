@@ -225,7 +225,11 @@ def get_user_registration(contest_id: int, user: models.User, db: Session):
 
     return None, False
 
-def check_problem_access(contest_id: int, user: Optional[models.User], db: Session):
+def check_problem_access(contest_id: Optional[int], user: Optional[models.User], db: Session, problem: Optional[models.Problem] = None):
+    # Standalone practice problems (contest_id is None) or explicitly published problems are accessible to everyone
+    if contest_id is None or (problem and problem.is_published):
+        return
+
     if not user:
         raise HTTPException(
             status_code=403,
@@ -625,6 +629,258 @@ def get_contest_registrations(
 # Problem Endpoints
 # ----------------------------
 
+@app.get("/problems", response_model=List[schemas.ProblemWithDetailsResponse])
+def list_all_problems(
+    difficulty: Optional[str] = Query(None),
+    contest_id: Optional[int] = Query(None),
+    search: Optional[str] = Query(None),
+    db: Session = Depends(get_db),
+    current_user: Optional[models.User] = Depends(auth.get_optional_user)
+):
+    query = db.query(models.Problem)
+    if difficulty:
+        query = query.filter(models.Problem.difficulty == difficulty)
+    if contest_id:
+        query = query.filter(models.Problem.contest_id == contest_id)
+    if search:
+        query = query.filter(models.Problem.title.ilike(f"%{search}%"))
+
+    all_problems = query.all()
+    results = []
+
+    contests = {c.id: c for c in db.query(models.Contest).all()}
+    is_organizer = current_user and current_user.role == "organizer"
+
+    for p in all_problems:
+        c = contests.get(p.contest_id) if p.contest_id else None
+
+        # Standard Participant Filter for Problems Section:
+        # Standalone problems (contest_id is None) or explicitly published problems or past contest problems are visible.
+        # Upcoming or live contest problems that are NOT published MUST NOT be shown to participants in the practice Problems section.
+        if not is_organizer:
+            if p.contest_id is not None:
+                is_contest_past = c and (c.end_time <= datetime.utcnow())
+                if not p.is_published and not is_contest_past:
+                    continue
+
+        tcs = db.query(models.TestCase).filter(models.TestCase.problem_id == p.id).all()
+        sample_cases = [
+            schemas.TestCaseResponse(
+                id=tc.id,
+                input=tc.input,
+                expected_output=tc.expected_output,
+                is_sample=tc.is_sample
+            ) for tc in tcs if tc.is_sample
+        ]
+        all_cases = [
+            schemas.TestCaseResponse(
+                id=tc.id,
+                input=tc.input,
+                expected_output=tc.expected_output,
+                is_sample=tc.is_sample
+            ) for tc in tcs
+        ] if is_organizer else []
+
+        results.append(schemas.ProblemWithDetailsResponse(
+            id=p.id,
+            contest_id=p.contest_id,
+            contest_title=c.title if c else "Standalone Practice",
+            is_published=p.is_published,
+            title=p.title,
+            statement=p.statement,
+            time_limit_ms=p.time_limit_ms,
+            difficulty=p.difficulty,
+            test_cases_count=len(tcs),
+            sample_test_cases=sample_cases,
+            all_test_cases=all_cases
+        ))
+
+    return results
+
+@app.post("/problems", response_model=schemas.ProblemWithDetailsResponse)
+def create_standalone_problem(
+    problem_data: schemas.ProblemCreate,
+    contest_id: Optional[int] = Query(None),
+    db: Session = Depends(get_db),
+    organizer: models.User = Depends(auth.require_organizer)
+):
+    target_contest_id = problem_data.contest_id if problem_data.contest_id is not None else contest_id
+
+    contest = None
+    if target_contest_id:
+        contest = db.query(models.Contest).filter(models.Contest.id == target_contest_id).first()
+        if not contest:
+            raise HTTPException(status_code=404, detail="Selected contest not found")
+
+    is_pub = True if target_contest_id is None else (problem_data.is_published if problem_data.is_published is not None else False)
+
+    problem = models.Problem(
+        contest_id=target_contest_id,
+        is_published=is_pub,
+        title=problem_data.title,
+        statement=problem_data.statement,
+        time_limit_ms=problem_data.time_limit_ms,
+        difficulty=problem_data.difficulty
+    )
+    db.add(problem)
+    db.commit()
+    db.refresh(problem)
+
+    test_case_models = []
+    for tc in problem_data.test_cases:
+        t = models.TestCase(
+            problem_id=problem.id,
+            input=tc.input,
+            expected_output=tc.expected_output,
+            is_sample=tc.is_sample
+        )
+        db.add(t)
+        test_case_models.append(t)
+
+    db.commit()
+
+    sample_cases = [
+        schemas.TestCaseResponse(
+            id=tc.id,
+            input=tc.input,
+            expected_output=tc.expected_output,
+            is_sample=tc.is_sample
+        ) for tc in test_case_models if tc.is_sample
+    ]
+    all_cases = [
+        schemas.TestCaseResponse(
+            id=tc.id,
+            input=tc.input,
+            expected_output=tc.expected_output,
+            is_sample=tc.is_sample
+        ) for tc in test_case_models
+    ]
+
+    return schemas.ProblemWithDetailsResponse(
+        id=problem.id,
+        contest_id=problem.contest_id,
+        contest_title=contest.title if contest else "Standalone Practice",
+        is_published=problem.is_published,
+        title=problem.title,
+        statement=problem.statement,
+        time_limit_ms=problem.time_limit_ms,
+        difficulty=problem.difficulty,
+        test_cases_count=len(test_case_models),
+        sample_test_cases=sample_cases,
+        all_test_cases=all_cases
+    )
+
+@app.put("/problems/{problem_id}", response_model=schemas.ProblemWithDetailsResponse)
+def update_problem(
+    problem_id: int,
+    problem_data: schemas.ProblemUpdate,
+    db: Session = Depends(get_db),
+    organizer: models.User = Depends(auth.require_organizer)
+):
+    problem = db.query(models.Problem).filter(models.Problem.id == problem_id).first()
+    if not problem:
+        raise HTTPException(status_code=404, detail="Problem not found")
+
+    if problem_data.title is not None:
+        problem.title = problem_data.title
+    if problem_data.statement is not None:
+        problem.statement = problem_data.statement
+    if problem_data.time_limit_ms is not None:
+        problem.time_limit_ms = problem_data.time_limit_ms
+    if problem_data.difficulty is not None:
+        problem.difficulty = problem_data.difficulty
+    if problem_data.is_published is not None:
+        problem.is_published = problem_data.is_published
+    if 'contest_id' in problem_data.__fields_set__:
+        if problem_data.contest_id is not None:
+            contest = db.query(models.Contest).filter(models.Contest.id == problem_data.contest_id).first()
+            if not contest:
+                raise HTTPException(status_code=404, detail="Target contest not found")
+            problem.contest_id = problem_data.contest_id
+        else:
+            problem.contest_id = None
+
+    db.commit()
+
+    if problem_data.test_cases is not None:
+        db.query(models.TestCase).filter(models.TestCase.problem_id == problem.id).delete()
+        db.commit()
+        for tc in problem_data.test_cases:
+            t = models.TestCase(
+                problem_id=problem.id,
+                input=tc.input,
+                expected_output=tc.expected_output,
+                is_sample=tc.is_sample
+            )
+            db.add(t)
+        db.commit()
+
+    db.refresh(problem)
+    contest = db.query(models.Contest).filter(models.Contest.id == problem.contest_id).first() if problem.contest_id else None
+    tcs = db.query(models.TestCase).filter(models.TestCase.problem_id == problem.id).all()
+
+    sample_cases = [
+        schemas.TestCaseResponse(
+            id=tc.id,
+            input=tc.input,
+            expected_output=tc.expected_output,
+            is_sample=tc.is_sample
+        ) for tc in tcs if tc.is_sample
+    ]
+    all_cases = [
+        schemas.TestCaseResponse(
+            id=tc.id,
+            input=tc.input,
+            expected_output=tc.expected_output,
+            is_sample=tc.is_sample
+        ) for tc in tcs
+    ]
+
+    return schemas.ProblemWithDetailsResponse(
+        id=problem.id,
+        contest_id=problem.contest_id,
+        contest_title=contest.title if contest else "Standalone Practice",
+        is_published=problem.is_published,
+        title=problem.title,
+        statement=problem.statement,
+        time_limit_ms=problem.time_limit_ms,
+        difficulty=problem.difficulty,
+        test_cases_count=len(tcs),
+        sample_test_cases=sample_cases,
+        all_test_cases=all_cases
+    )
+
+@app.post("/contests/{contest_id}/publish-problems")
+def publish_contest_problems(
+    contest_id: int,
+    db: Session = Depends(get_db),
+    organizer: models.User = Depends(auth.require_organizer)
+):
+    contest = db.query(models.Contest).filter(models.Contest.id == contest_id).first()
+    if not contest:
+        raise HTTPException(status_code=404, detail="Contest not found")
+
+    problems = db.query(models.Problem).filter(models.Problem.contest_id == contest_id).all()
+    for p in problems:
+        p.is_published = True
+    db.commit()
+
+    return {"message": f"Successfully published {len(problems)} problem(s) from contest #{contest_id} to the general Problems section."}
+
+@app.delete("/problems/{problem_id}")
+def delete_problem(
+    problem_id: int,
+    db: Session = Depends(get_db),
+    organizer: models.User = Depends(auth.require_organizer)
+):
+    problem = db.query(models.Problem).filter(models.Problem.id == problem_id).first()
+    if not problem:
+        raise HTTPException(status_code=404, detail="Problem not found")
+
+    db.delete(problem)
+    db.commit()
+    return {"message": f"Problem #{problem_id} deleted successfully"}
+
 @app.get("/contests/{contest_id}/problems", response_model=List[schemas.ProblemResponse])
 def list_problems(
     contest_id: int,
@@ -941,21 +1197,23 @@ def submit_code(
         exec_time = int(res["execution_time_ms"] or 0)
         if res["status"] == "AC":
             protocol_lines.append(f"Test: #{idx}, time: {exec_time} ms., memory: 0 KB, exit code: 0, verdict: OK")
-            protocol_lines.append("Copy\nInput\n" + (tc.input if tc.input else ""))
-            protocol_lines.append("Copy\nOutput\n" + (res["user_output"].strip() if res["user_output"] else ""))
-            protocol_lines.append("Copy\nAnswer\n" + (tc.expected_output.strip() if tc.expected_output else ""))
-            protocol_lines.append(f'Checker Log\nok 2 number(s): "{res["user_output"].strip() if res["user_output"] else ""}"\n')
         else:
-            verdict_str = "WRONG_ANSWER" if res["status"] == "WA" else res["status"]
+            overall_verdict = res["status"]
+            verdict_str = "WRONG_ANSWER" if res["status"] == "WA" else ("TIME_LIMIT_EXCEEDED" if res["status"] == "TLE" else ("RUNTIME_ERROR" if res["status"] == "RE" else res["status"]))
             protocol_lines.append(f"Test: #{idx}, time: {exec_time} ms., memory: 0 KB, exit code: 1, verdict: {verdict_str}")
-            protocol_lines.append("Copy\nInput\n" + (tc.input if tc.input else ""))
-            protocol_lines.append("Copy\nOutput\n" + (res["user_output"].strip() if res["user_output"] else ""))
-            protocol_lines.append("Copy\nAnswer\n" + (tc.expected_output.strip() if tc.expected_output else ""))
-            err_msg = res["error"] or f"wrong answer 1st numbers differ - expected: '{tc.expected_output.strip()}', found: '{res['user_output'].strip()}'"
+            user_out_str = (res["user_output"] or "").strip()
+            exp_out_str = (tc.expected_output or "").strip()
+            protocol_lines.append("Input\n" + (tc.input if tc.input else ""))
+            protocol_lines.append("Output\n" + user_out_str)
+            protocol_lines.append("Answer\n" + exp_out_str)
+            err_msg = res["error"] or f"wrong answer 1st numbers differ - expected: '{exp_out_str}', found: '{user_out_str}'"
             protocol_lines.append(f"Checker Log\n{err_msg}\n")
+            break
 
     judgement_protocol_text = None
     if overall_verdict != "AC":
+        verdict_full_str = "Wrong Answer" if overall_verdict == "WA" else ("Time Limit Exceeded" if overall_verdict == "TLE" else ("Runtime Error" if overall_verdict == "RE" else overall_verdict))
+        protocol_lines.append(f"Submission verdict: {verdict_full_str}")
         judgement_protocol_text = "\n".join(protocol_lines)
 
     score = 100.0 if overall_verdict == "AC" else 0.0
@@ -967,7 +1225,8 @@ def submit_code(
         language=submission_data.language,
         code=submission_data.code,
         verdict=overall_verdict,
-        score=score
+        score=score,
+        judgement_protocol=judgement_protocol_text
     )
     db.add(submission)
     db.commit()
@@ -1028,7 +1287,7 @@ def get_submissions(
             verdict=s.verdict,
             score=s.score,
             submitted_at=s.submitted_at,
-            judgement_protocol=None
+            judgement_protocol=s.judgement_protocol
         ))
     return results
 

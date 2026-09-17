@@ -48,10 +48,28 @@ export const api = {
   getContestRegistrations: (id: number | string) => fetchApi(`/contests/${id}/registrations`),
 
   // Problems
+  getAllProblems: (filters?: { difficulty?: string; contestId?: number | string; search?: string }) => {
+    const params = new URLSearchParams();
+    if (filters?.difficulty) params.append('difficulty', filters.difficulty);
+    if (filters?.contestId) params.append('contest_id', String(filters.contestId));
+    if (filters?.search) params.append('search', filters.search);
+    const query = params.toString() ? `?${params.toString()}` : '';
+    return fetchApi(`/problems${query}`);
+  },
   getProblems: (contestId: number | string) => fetchApi(`/contests/${contestId}/problems`),
   getProblem: (id: number | string) => fetchApi(`/problems/${id}`),
   createProblem: (contestId: number | string, data: any) =>
     fetchApi(`/contests/${contestId}/problems`, { method: 'POST', body: JSON.stringify(data) }),
+  createProblemDirect: (data: any, contestId?: number | string | null) => {
+    const query = contestId ? `?contest_id=${contestId}` : '';
+    return fetchApi(`/problems${query}`, { method: 'POST', body: JSON.stringify(data) });
+  },
+  updateProblem: (id: number | string, data: any) =>
+    fetchApi(`/problems/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  deleteProblem: (id: number | string) =>
+    fetchApi(`/problems/${id}`, { method: 'DELETE' }),
+  publishContestProblems: (contestId: number | string) =>
+    fetchApi(`/contests/${contestId}/publish-problems`, { method: 'POST' }),
   importCodeforcesProblem: (contestId: number | string, url: string) =>
     fetchApi(`/contests/${contestId}/import-codeforces`, { method: 'POST', body: JSON.stringify({ url }) }),
   parseCodeforcesProblem: (url: string) =>

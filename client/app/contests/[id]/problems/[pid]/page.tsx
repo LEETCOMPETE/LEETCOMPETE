@@ -89,6 +89,54 @@ export default function CodeforcesProblemPage() {
   const [loadingSubmissions, setLoadingSubmissions] = useState(false);
   const [selectedSubDetail, setSelectedSubDetail] = useState<any>(null);
 
+  const getProtocolText = (sub: any) => {
+    if (!sub) return '';
+    if (sub.judgement_protocol && sub.judgement_protocol.trim()) {
+      return sub.judgement_protocol;
+    }
+    const verdictName = sub.verdict === 'WA' ? 'Wrong Answer' : sub.verdict === 'TLE' ? 'Time Limit Exceeded' : sub.verdict === 'RE' ? 'Runtime Error' : sub.verdict;
+    const verdictCode = sub.verdict === 'WA' ? 'WRONG_ANSWER' : sub.verdict;
+
+    const lines: string[] = ['→ Judgement Protocol'];
+
+    if (sub.test_case_results && sub.test_case_results.length > 0) {
+      for (let idx = 0; idx < sub.test_case_results.length; idx++) {
+        const tc = sub.test_case_results[idx];
+        const tcVerdict = tc.status === 'WA' ? 'WRONG_ANSWER' : tc.status === 'AC' ? 'OK' : tc.status;
+        lines.push(`Test: #${idx + 1}, time: ${Math.round(tc.execution_time_ms || 0)} ms., memory: 0 KB, exit code: ${tc.status === 'AC' ? 0 : 1}, verdict: ${tcVerdict}`);
+        
+        if (tc.status !== 'AC') {
+          if (tc.input_str !== undefined && tc.input_str !== null) {
+            lines.push(`Input\n${tc.input_str}`);
+          }
+          if (tc.user_output !== undefined && tc.user_output !== null) {
+            lines.push(`Output\n${(tc.user_output || '').trim()}`);
+          }
+          if (tc.expected_output !== undefined && tc.expected_output !== null) {
+            lines.push(`Answer\n${(tc.expected_output || '').trim()}`);
+          }
+          const userOutStr = (tc.user_output || '').trim();
+          const expOutStr = (tc.expected_output || '').trim();
+          lines.push(`Checker Log\n${tc.error || (tc.status === 'WA' ? `wrong answer 1st numbers differ - expected: '${expOutStr}', found: '${userOutStr}'` : tc.status)}\n`);
+          break;
+        }
+      }
+    } else if (problem && problem.sample_test_cases && problem.sample_test_cases.length > 0) {
+      const sample = problem.sample_test_cases[0];
+      lines.push(`Test: #1, verdict: ${verdictCode}`);
+      lines.push(`Input\n${sample.input || ''}`);
+      lines.push(`Output\n`);
+      lines.push(`Answer\n${(sample.expected_output || '').trim()}`);
+      lines.push(`Checker Log\nwrong answer 1st numbers differ - expected: '${(sample.expected_output || '').trim()}', found: ''\n`);
+    } else {
+      lines.push(`Test: #1, verdict: ${verdictCode}`);
+      lines.push(`Checker Log\nSubmission verdict: ${verdictName}\n`);
+    }
+
+    lines.push(`Submission verdict: ${verdictName}`);
+    return lines.join('\n');
+  };
+
   // File Upload Reader & Auto Language Detector
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -622,7 +670,7 @@ export default function CodeforcesProblemPage() {
                             ) : (
                               <XCircle className="w-3.5 h-3.5 text-rose-400" />
                             )}
-                            <span>{sub.verdict === 'AC' ? 'Accepted' : sub.verdict}</span>
+                            <span>{sub.verdict === 'AC' ? 'Accepted' : sub.verdict === 'WA' ? 'Wrong Answer' : sub.verdict}</span>
                           </span>
                         </td>
                         <td className="px-5 py-4 font-bold text-white">
@@ -678,7 +726,7 @@ export default function CodeforcesProblemPage() {
               <div>
                 <span className="text-[10px] text-slate-500 block">Verdict</span>
                 <span className={`font-bold ${selectedSubDetail.verdict === 'AC' ? 'text-emerald-400' : 'text-rose-400'}`}>
-                  {selectedSubDetail.verdict}
+                  {selectedSubDetail.verdict === 'AC' ? 'Accepted' : selectedSubDetail.verdict === 'WA' ? 'Wrong Answer' : selectedSubDetail.verdict}
                 </span>
               </div>
               <div>
@@ -709,7 +757,7 @@ export default function CodeforcesProblemPage() {
                   <span>Judgement Protocol & Checker Logs</span>
                 </span>
                 <pre className="p-4 bg-[#0B1120] border border-slate-800 rounded-xl text-slate-300 text-xs overflow-x-auto whitespace-pre-wrap leading-relaxed max-h-72">
-                  {selectedSubDetail.judgement_protocol || `→ Judgement Protocol\nTest: #1, verdict: ${selectedSubDetail.verdict === 'WA' ? 'WRONG_ANSWER' : selectedSubDetail.verdict}\nChecker Log\nSubmission verdict: ${selectedSubDetail.verdict}`}
+                  {getProtocolText(selectedSubDetail)}
                 </pre>
               </div>
             )}
