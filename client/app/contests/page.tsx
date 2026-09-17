@@ -6,6 +6,33 @@ import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { Trophy, Clock, Search, PlusCircle, CheckCircle2, ArrowRight, Calendar, Award } from 'lucide-react';
 
+function formatContestDuration(startTimeStr?: string, endTimeStr?: string): string {
+  if (!startTimeStr || !endTimeStr) return 'N/A';
+  const start = new Date(startTimeStr).getTime();
+  const end = new Date(endTimeStr).getTime();
+  const diffMs = end - start;
+  if (isNaN(diffMs) || diffMs <= 0) return 'N/A';
+
+  const totalMinutes = Math.floor(diffMs / (1000 * 60));
+  const days = Math.floor(totalMinutes / (60 * 24));
+  const hours = Math.floor((totalMinutes % (60 * 24)) / 60);
+  const minutes = totalMinutes % 60;
+
+  if (days > 0 && hours === 0 && minutes === 0) {
+    return `${days * 24} Hrs`;
+  }
+  if (days === 0 && hours > 0 && minutes === 0) {
+    return `${hours} Hrs`;
+  }
+
+  const parts: string[] = [];
+  if (days > 0) parts.push(`${days}d`);
+  if (hours > 0) parts.push(`${hours}h`);
+  if (minutes > 0 || parts.length === 0) parts.push(`${minutes}m`);
+
+  return parts.join(' ');
+}
+
 export default function ContestsListPage() {
   const { user } = useAuth();
   const [contests, setContests] = useState<any[]>([]);
@@ -154,7 +181,7 @@ export default function ContestsListPage() {
 
                       {/* Duration */}
                       <td className="px-4 py-4 text-center text-slate-700 dark:text-slate-300 font-mono text-[11px]">
-                        24 Hrs
+                        {formatContestDuration(c.start_time, c.end_time)}
                       </td>
 
                       {/* Status */}
