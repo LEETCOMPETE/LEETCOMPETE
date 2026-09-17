@@ -23,50 +23,6 @@ import {
   Upload
 } from 'lucide-react';
 
-const STARTER_CODE: Record<string, string> = {
-  python: `import sys
-
-def solve():
-    lines = sys.stdin.read().splitlines()
-    if not lines:
-        return
-    # Write your solution here
-
-if __name__ == "__main__":
-    solve()
-`,
-  cpp: `#include <iostream>
-#include <vector>
-#include <string>
-using namespace std;
-
-int main() {
-    ios_base::sync_with_stdio(false);
-    cin.tie(NULL);
-    // Write your solution here
-    return 0;
-}
-`,
-  java: `import java.util.Scanner;
-
-public class Solution {
-    public static void main(String[] args) {
-        Scanner sc = new Scanner(System.in);
-        // Write your solution here
-    }
-}
-`,
-  javascript: `const fs = require('fs');
-
-function solve() {
-    const input = fs.readFileSync(0, 'utf-8');
-    // Write your solution here
-}
-
-solve();
-`,
-};
-
 type ActiveTab = 'statement' | 'submit' | 'submissions';
 
 export default function CodeforcesProblemPage() {
@@ -80,7 +36,7 @@ export default function CodeforcesProblemPage() {
 
   // Editor & Submission State
   const [language, setLanguage] = useState<string>('python');
-  const [code, setCode] = useState<string>(STARTER_CODE.python);
+  const [code, setCode] = useState<string>('');
   const [uploadedFileName, setUploadedFileName] = useState<string>('');
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const pendingFileCodeRef = React.useRef<string | null>(null);
@@ -181,7 +137,7 @@ export default function CodeforcesProblemPage() {
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
-    setCode(STARTER_CODE[language] || '');
+    setCode('');
   };
 
   // Copy Feedback State
@@ -221,9 +177,6 @@ export default function CodeforcesProblemPage() {
 
   const handleLanguageChange = (newLang: string) => {
     setLanguage(newLang);
-    if (!uploadedFileName && !pendingFileCodeRef.current && (!code || code === STARTER_CODE[language])) {
-      setCode(STARTER_CODE[newLang] || '');
-    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -560,11 +513,11 @@ export default function CodeforcesProblemPage() {
               <span>Source Code:</span>
               <button
                 type="button"
-                onClick={() => setCode(STARTER_CODE[language] || '')}
+                onClick={() => setCode('')}
                 className="hover:text-slate-200 text-[11px] flex items-center space-x-1"
               >
                 <RefreshCw className="w-3 h-3" />
-                <span>Reset Template</span>
+                <span>Clear Code</span>
               </button>
             </div>
 
