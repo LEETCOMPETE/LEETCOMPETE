@@ -1,0 +1,50 @@
+# Dependencies
+node_modules/
+/.pnp
+.pnp.js
+venv/
+env/
+.venv/
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Testing & Coverage
+.pytest_cache/
+coverage/
+
+# Next.js & Build Outputs
+/.next/
+/out/
+/build/
+/dist/
+.turbo/
+*.tsbuildinfo
+
+# Environment & Secret Files
+.env
+.env.local
+.env.development.local
+.env.production.local
+*.env
+
+# SQLite Databases & Local Storage
+*.db
+*.sqlite
+*.sqlite3
+!server/leetcompete.db.example
+
+# Logs & Runtime Files
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+logs/
+
+# IDE & OS Files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+*.swo
